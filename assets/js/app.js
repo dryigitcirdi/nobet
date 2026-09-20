@@ -1,485 +1,278 @@
 /**
  * ==========================================================================
- * VIGIL — Core Unified Application Engine
- * Works seamlessly on BOTH http(s):// AND file:/// (Direct Double Click)
+ * VIGIL — Klinik Nöbet & İcap Portalı Engine (v2.5)
+ * Configured for Dr. Umut Akgün, Dr. Yiğit Cirdi & Klinik Ekibi
  * ==========================================================================
  */
 
 // --------------------------------------------------------------------------
-// 1. MOCK DATA GENERATOR
+// 1. KLİNİK HEKİM REHBERİ (DOKTORLAR & TELEFONLAR)
 // --------------------------------------------------------------------------
-function generateMockDutyRoster() {
-  const doctors = [
-    {
-      name: "Prof. Dr. Cihan Karadağ",
-      role: "Nöbetçi Klinik Şefi",
-      dept: "Girişimsel Kardiyoloji & Acil",
-      phone: "+90 532 890 12 34",
-      type: "nobet"
-    },
-    {
-      name: "Doç. Dr. Melis Sancak",
-      role: "İcapçı Uzman Hekim",
-      dept: "Anesteziyoloji & Yoğun Bakım",
-      phone: "+90 533 456 78 90",
-      type: "icap"
-    },
-    {
-      name: "Op. Dr. Barış Akın",
-      role: "Nöbetçi Uzman Cerrah",
-      dept: "Genel Cerrahi & Travmatoloji",
-      phone: "+90 535 678 90 12",
-      type: "nobet"
-    },
-    {
-      name: "Doç. Dr. Ece Doğanay",
-      role: "İcapçı Kıdemli Konsültan",
-      dept: "Nöroradyoloji & İnme Ünitesi",
-      phone: "+90 530 123 45 67",
-      type: "icap"
-    },
-    {
-      name: "Uzm. Dr. Kerem Yılmaz",
-      role: "Nöbetçi Acil Sorumlusu",
-      dept: "Erişkin Acil Tıp Kliniği",
-      phone: "+90 532 345 67 89",
-      type: "nobet"
-    },
-    {
-      name: "Prof. Dr. Leyla Gürsoy",
-      role: "İcapçı Damar Cerrahı",
-      dept: "Kalp & Damar Cerrahisi",
-      phone: "+90 542 987 65 43",
-      type: "icap"
-    },
-    {
-      name: "Op. Dr. Deniz Tan",
-      role: "Nöbetçi Ortopedi Uzmanı",
-      dept: "Ortopedi & El Cerrahisi",
-      phone: "+90 537 234 56 78",
-      type: "nobet"
-    },
-    {
-      name: "Doç. Dr. Arda Vural",
-      role: "İcapçı Girişimsel Radyolog",
-      dept: "Girişimsel Vasküler Radyoloji",
-      phone: "+90 538 876 54 32",
-      type: "icap"
-    }
-  ];
+const INITIAL_DOCTORS = {
+  "UA": { code: "UA", name: "Dr. Umut Akgün", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "YC": { code: "YC", name: "Dr. Yiğit Cirdi", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "KS": { code: "KS", name: "Dr. Kerim S.", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "KÖ": { code: "KÖ", name: "Dr. KÖ", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "BA": { code: "BA", name: "Dr. BA", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "SG": { code: "SG", name: "Dr. SG", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "EK": { code: "EK", name: "Dr. EK", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "DG": { code: "DG", name: "Dr. DG", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "AB": { code: "AB", name: "Dr. AB", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
+};
 
-  const now = new Date();
-  const schedule = [];
+const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v2';
+const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v2';
+const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url_v2';
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
 
-  for (let offset = -10; offset <= 35; offset++) {
-    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    const yyyy = targetDate.getFullYear();
-    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(targetDate.getDate()).padStart(2, '0');
-    const dateStr = `${yyyy}-${mm}-${dd}`;
-
-    const cycleIndex = Math.abs(targetDate.getDate() + targetDate.getMonth() * 31) % (doctors.length / 2);
-    const nobetDoc = doctors[cycleIndex * 2];
-    const icapDoc = doctors[cycleIndex * 2 + 1];
-
-    schedule.push({
-      date: dateStr,
-      nobetci: nobetDoc.name,
-      nobetciRole: nobetDoc.role,
-      nobetciDept: nobetDoc.dept,
-      nobetciPhone: nobetDoc.phone,
-      icapci: icapDoc.name,
-      icapciRole: icapDoc.role,
-      icapciDept: icapDoc.dept,
-      icapciPhone: icapDoc.phone,
-      notes: targetDate.getDay() === 0 || targetDate.getDay() === 6 ? "Hafta Sonu 24 Saat Blok Nöbet" : "16:00 - 08:00 Kesintisiz Nöbet Vardiyası"
-    });
+class DoctorDirectory {
+  constructor() {
+    this.doctors = this.load();
   }
 
-  return schedule;
+  load() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DOCTORS);
+      if (saved) {
+        return { ...INITIAL_DOCTORS, ...JSON.parse(saved) };
+      }
+    } catch (e) {}
+    return { ...INITIAL_DOCTORS };
+  }
+
+  save() {
+    try {
+      localStorage.setItem(STORAGE_KEY_DOCTORS, JSON.stringify(this.doctors));
+    } catch (e) {}
+  }
+
+  getDoctor(code) {
+    if (!code) return { code: '??', name: 'Belirtilmedi', role: 'Uzman Hekim', phone: '' };
+    const cleanCode = code.trim().toUpperCase();
+    if (this.doctors[cleanCode]) return this.doctors[cleanCode];
+
+    // Check if code matches a name prefix
+    for (const k in this.doctors) {
+      if (this.doctors[k].name.toLowerCase().includes(cleanCode.toLowerCase())) {
+        return this.doctors[k];
+      }
+    }
+    return { code: cleanCode, name: `Dr. ${cleanCode}`, role: 'Uzman Hekim', phone: '' };
+  }
+
+  updateDoctor(code, name, phone) {
+    const cleanCode = code.trim().toUpperCase();
+    if (!this.doctors[cleanCode]) {
+      this.doctors[cleanCode] = { code: cleanCode, name: name || `Dr. ${cleanCode}`, role: 'Uzman Hekim', phone: phone || '' };
+    } else {
+      if (name) this.doctors[cleanCode].name = name;
+      this.doctors[cleanCode].phone = phone || '';
+    }
+    this.save();
+  }
+
+  getAll() {
+    return Object.values(this.doctors);
+  }
 }
 
 // --------------------------------------------------------------------------
-// 2. GOOGLE DRIVE / SHEETS SERVICE
+// 2. GOOGLE DRIVE / HAFTALIK İCAP LİSTESİ SERVİSİ
 // --------------------------------------------------------------------------
-const STORAGE_KEY_DATA = 'vigil_roster_data';
-const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url';
-const STORAGE_KEY_LAST_SYNC = 'vigil_last_sync';
-
-class DriveService {
-  constructor() {
-    this.sheetUrl = this.getSafeStorage(STORAGE_KEY_SHEET_URL) || '';
-  }
-
-  getSafeStorage(key) {
-    try {
-      return localStorage.getItem(key);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  setSafeStorage(key, val) {
-    try {
-      localStorage.setItem(key, val);
-    } catch (e) {}
-  }
-
-  removeSafeStorage(key) {
-    try {
-      localStorage.removeItem(key);
-    } catch (e) {}
+class WeeklyDriveService {
+  constructor(directory) {
+    this.directory = directory;
+    this.sheetUrl = localStorage.getItem(STORAGE_KEY_SHEET_URL) || DEFAULT_SHEET_URL;
   }
 
   setSheetUrl(url) {
-    this.sheetUrl = (url || '').trim();
-    if (this.sheetUrl) {
-      this.setSafeStorage(STORAGE_KEY_SHEET_URL, this.sheetUrl);
-    } else {
-      this.removeSafeStorage(STORAGE_KEY_SHEET_URL);
-    }
+    this.sheetUrl = (url || '').trim() || DEFAULT_SHEET_URL;
+    localStorage.setItem(STORAGE_KEY_SHEET_URL, this.sheetUrl);
   }
 
   getSheetUrl() {
     return this.sheetUrl;
   }
 
-  getLastSyncTime() {
-    const raw = this.getSafeStorage(STORAGE_KEY_LAST_SYNC);
-    if (!raw) return null;
-    return new Date(raw);
+  parseDmy(str) {
+    if (!str) return null;
+    const m = String(str).trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if (!m) return null;
+    const dd = m[1].padStart(2, '0');
+    const mm = m[2].padStart(2, '0');
+    const yyyy = m[3];
+    return {
+      iso: `${yyyy}-${mm}-${dd}`,
+      dateObj: new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10))
+    };
   }
 
-  extractSheetId(urlOrId) {
-    if (!urlOrId) return null;
-    const trimmed = urlOrId.trim();
-    if (/^[a-zA-Z0-9-_]{25,}$/.test(trimmed)) {
-      return trimmed;
-    }
-    const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : null;
+  extractSheetIdAndGid(url) {
+    const idMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    const gidMatch = url.match(/[#&?]gid=([0-9]+)/);
+    return {
+      sheetId: idMatch ? idMatch[1] : '1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0',
+      gid: gidMatch ? gidMatch[1] : '2016035520'
+    };
   }
 
-  normalizeDate(raw) {
-    if (!raw) return null;
-    const str = String(raw).trim();
-
-    const gvizMatch = str.match(/Date\((\d+),(\d+),(\d+)\)/);
-    if (gvizMatch) {
-      const y = gvizMatch[1];
-      const m = String(parseInt(gvizMatch[2], 10) + 1).padStart(2, '0');
-      const d = String(parseInt(gvizMatch[3], 10)).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    const dmyMatch = str.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-    if (dmyMatch) {
-      const d = dmyMatch[1].padStart(2, '0');
-      const m = dmyMatch[2].padStart(2, '0');
-      const y = dmyMatch[3];
-      return `${y}-${m}-${d}`;
-    }
-
-    const ymdMatch = str.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
-    if (ymdMatch) {
-      const y = ymdMatch[1];
-      const m = ymdMatch[2].padStart(2, '0');
-      const d = ymdMatch[3].padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-      const y = parsed.getFullYear();
-      const m = String(parsed.getMonth() + 1).padStart(2, '0');
-      const d = String(parsed.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    return null;
-  }
-
-  async fetchRoster(forceRefresh = false) {
-    const cached = this.getSafeStorage(STORAGE_KEY_DATA);
-    let parsedCache = null;
-    if (cached) {
-      try {
-        parsedCache = JSON.parse(cached);
-      } catch (e) {}
-    }
-
-    if (!this.sheetUrl) {
-      const mock = generateMockDutyRoster();
-      return {
-        source: 'mock',
-        data: mock,
-        lastSync: new Date()
-      };
-    }
-
-    const lastSyncTime = this.getLastSyncTime();
-    if (!forceRefresh && parsedCache && lastSyncTime && (Date.now() - lastSyncTime.getTime() < 120000)) {
-      return {
-        source: 'cache',
-        data: parsedCache,
-        lastSync: lastSyncTime
-      };
-    }
+  async fetchWeeklyRoster() {
+    const { sheetId, gid } = this.extractSheetIdAndGid(this.sheetUrl);
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=${gid}`;
 
     try {
-      const sheetId = this.extractSheetId(this.sheetUrl);
-      let rows = [];
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Google Sheets HTTP ${response.status}`);
+      const text = await response.text();
+      const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);?/);
+      if (!match || !match[1]) throw new Error('E-Tablo formatı çözülemedi.');
 
-      if (this.sheetUrl.includes('/pub') && this.sheetUrl.includes('output=csv')) {
-        rows = await this.fetchPublishedCsv(this.sheetUrl);
-      } else if (sheetId) {
-        rows = await this.fetchGVizJson(sheetId);
-      } else {
-        throw new Error('Geçersiz Google E-Tablo formatı.');
-      }
+      const json = JSON.parse(match[1]);
+      const rows = json.table.rows || [];
+      const roster = [];
 
-      if (rows && rows.length > 0) {
-        this.setSafeStorage(STORAGE_KEY_DATA, JSON.stringify(rows));
-        this.setSafeStorage(STORAGE_KEY_LAST_SYNC, new Date().toISOString());
-        return {
-          source: 'cloud',
-          data: rows,
-          lastSync: new Date()
+      rows.forEach(r => {
+        if (!r || !r.c) return;
+        const getCell = (idx) => {
+          if (!r.c[idx]) return '';
+          return (r.c[idx].f || r.c[idx].v || '').toString().trim();
         };
-      } else {
-        throw new Error('Tabloda nöbet verisi bulunamadı.');
-      }
-    } catch (err) {
-      if (parsedCache && parsedCache.length > 0) {
-        return {
-          source: 'cache_fallback',
-          error: err.message,
-          data: parsedCache,
-          lastSync: lastSyncTime || new Date()
-        };
-      }
+
+        const startStr = getCell(0);
+        const endStr = getCell(1);
+        const parsedStart = this.parseDmy(startStr);
+        const parsedEnd = this.parseDmy(endStr);
+        if (!parsedStart || !parsedEnd) return;
+
+        const scheduledCode = getCell(3);
+        const changeCode = getCell(4);
+        const note = getCell(5);
+        const extraChange = getCell(6);
+
+        // Determine active code
+        let activeCode = scheduledCode;
+        let isChanged = false;
+
+        if (changeCode && /^[A-ZÇĞİÖŞÜa-zçğıöşü]{2,4}$/.test(changeCode)) {
+          activeCode = changeCode;
+          isChanged = true;
+        } else if (extraChange && /^[A-ZÇĞİÖŞÜa-zçğıöşü]{2,4}$/.test(extraChange)) {
+          activeCode = extraChange;
+          isChanged = true;
+        }
+
+        const scheduledDoc = this.directory.getDoctor(scheduledCode);
+        const activeDoc = this.directory.getDoctor(activeCode);
+
+        roster.push({
+          startDate: parsedStart.iso,
+          endDate: parsedEnd.iso,
+          startDateObj: parsedStart.dateObj,
+          endDateObj: parsedEnd.dateObj,
+          rangeText: `${startStr} – ${endStr}`,
+          scheduledCode,
+          changeCode,
+          extraChange,
+          activeCode,
+          isChanged,
+          scheduledDoctor: scheduledDoc,
+          activeDoctor: activeDoc,
+          notes: note || ''
+        });
+      });
+
       return {
-        source: 'mock_fallback',
+        success: true,
+        source: 'cloud',
+        weeks: roster,
+        lastSync: new Date()
+      };
+    } catch (err) {
+      console.warn('Google Sheet fetch error:', err);
+      return {
+        success: false,
         error: err.message,
-        data: generateMockDutyRoster(),
+        weeks: this.generateFallbackWeeks(),
         lastSync: new Date()
       };
     }
   }
 
-  async fetchGVizJson(sheetId) {
-    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Google Sheets HTTP ${response.status}`);
-    const text = await response.text();
-    
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);?/);
-    if (!match || !match[1]) throw new Error('E-Tablo okunamadı.');
+  generateFallbackWeeks() {
+    const list = [];
+    const now = new Date();
+    const codes = ['KS', 'KÖ', 'BA', 'SG', 'YC', 'UA', 'EK'];
+    for (let i = -4; i <= 20; i++) {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1 + (i * 7));
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
 
-    const json = JSON.parse(match[1]);
-    const table = json.table;
-    if (!table || !table.rows) return [];
+      const fmt = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth()+1).padStart(2, '0')}.${d.getFullYear()}`;
+      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const roster = [];
-    table.rows.forEach(r => {
-      if (!r || !r.c) return;
-      const getVal = (idx) => {
-        if (!r.c[idx]) return '';
-        return (r.c[idx].f || r.c[idx].v || '').toString().trim();
-      };
+      const code = codes[Math.abs(i) % codes.length];
+      const doc = this.directory.getDoctor(code);
 
-      const rawDate = getVal(0);
-      const normalizedDate = this.normalizeDate(rawDate);
-      if (!normalizedDate) return;
-
-      roster.push({
-        date: normalizedDate,
-        nobetci: getVal(1) || 'Nöbetçi Belirtilmedi',
-        nobetciRole: getVal(2) || 'Nöbetçi Hekim',
-        nobetciPhone: getVal(3) || '',
-        icapci: getVal(4) || 'İcapçı Belirtilmedi',
-        icapciRole: getVal(5) || 'İcapçı Uzman',
-        icapciPhone: getVal(6) || '',
-        notes: getVal(7) || ''
-      });
-    });
-
-    return roster;
-  }
-
-  async fetchPublishedCsv(csvUrl) {
-    const response = await fetch(csvUrl);
-    if (!response.ok) throw new Error(`CSV Hatası (${response.status})`);
-    const text = await response.text();
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length < 2) return [];
-
-    const roster = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(/[,;\t]/).map(c => c.replace(/^"|"$/g, '').trim());
-      const normalizedDate = this.normalizeDate(cols[0]);
-      if (!normalizedDate) continue;
-
-      roster.push({
-        date: normalizedDate,
-        nobetci: cols[1] || 'Nöbetçi Belirtilmedi',
-        nobetciRole: cols[2] || 'Nöbetçi Hekim',
-        nobetciPhone: cols[3] || '',
-        icapci: cols[4] || 'İcapçı Belirtilmedi',
-        icapciRole: cols[5] || 'İcapçı Uzman',
-        icapciPhone: cols[6] || '',
-        notes: cols[7] || ''
+      list.push({
+        startDate: iso(start),
+        endDate: iso(end),
+        startDateObj: start,
+        endDateObj: end,
+        rangeText: `${fmt(start)} – ${fmt(end)}`,
+        scheduledCode: code,
+        activeCode: code,
+        isChanged: false,
+        scheduledDoctor: doc,
+        activeDoctor: doc,
+        notes: ''
       });
     }
-
-    return roster;
+    return list;
   }
 }
 
 // --------------------------------------------------------------------------
-// 3. 3D TILT & SPECULAR ENGINE
+// 3. 3D TILT ENGINE
 // --------------------------------------------------------------------------
 class TiltEngine {
   constructor() {
     this.cards = [];
-    this.orientationHandler = this.handleOrientation.bind(this);
-    this.initGyroscope();
+    this.startLoop();
   }
 
   attach(element, options = {}) {
     if (!element) return;
-    const config = {
-      maxRotation: options.maxRotation || 8,
-      perspective: options.perspective || 1000,
-      scale: options.scale || 1.015,
-      glare: options.glare !== false,
-      ...options
-    };
-
-    const cardData = {
-      el: element,
-      config,
-      rect: element.getBoundingClientRect(),
-      targetX: 0,
-      targetY: 0,
-      currentX: 0,
-      currentY: 0,
-      glareX: 50,
-      glareY: 50,
-      isHovered: false
-    };
+    const config = { maxRotation: options.maxRotation || 7, perspective: 1000, scale: 1.015, ...options };
+    const card = { el: element, config, tx: 0, ty: 0, cx: 0, cy: 0, hovered: false };
 
     element.style.transformStyle = 'preserve-3d';
     element.style.willChange = 'transform';
 
-    let glareEl = element.querySelector('.specular-glare');
-    if (config.glare && !glareEl) {
-      glareEl = document.createElement('div');
-      glareEl.className = 'specular-glare';
-      glareEl.style.position = 'absolute';
-      glareEl.style.inset = '0';
-      glareEl.style.borderRadius = 'inherit';
-      glareEl.style.pointerEvents = 'none';
-      glareEl.style.mixBlendMode = 'overlay';
-      glareEl.style.zIndex = '3';
-      glareEl.style.transition = 'opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
-      element.appendChild(glareEl);
-    }
-    cardData.glareEl = glareEl;
-
-    const onEnter = () => {
-      cardData.isHovered = true;
-      cardData.rect = element.getBoundingClientRect();
-      if (cardData.glareEl) cardData.glareEl.style.opacity = '1';
-    };
-
     const onMove = (e) => {
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const rect = cardData.rect;
-
-      const x = (clientX - rect.left) / rect.width;
-      const y = (clientY - rect.top) / rect.height;
-
-      const clampedX = Math.max(0, Math.min(1, x));
-      const clampedY = Math.max(0, Math.min(1, y));
-
-      cardData.targetX = (clampedY - 0.5) * -2 * config.maxRotation;
-      cardData.targetY = (clampedX - 0.5) * 2 * config.maxRotation;
-
-      cardData.glareX = clampedX * 100;
-      cardData.glareY = clampedY * 100;
+      const rect = element.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      const x = (cx - rect.left) / rect.width - 0.5;
+      const y = (cy - rect.top) / rect.height - 0.5;
+      card.tx = -y * config.maxRotation * 2;
+      card.ty = x * config.maxRotation * 2;
     };
 
-    const onLeave = () => {
-      cardData.isHovered = false;
-      cardData.targetX = 0;
-      cardData.targetY = 0;
-      if (cardData.glareEl) cardData.glareEl.style.opacity = '0';
-    };
-
-    element.addEventListener('pointerenter', onEnter);
+    element.addEventListener('pointerenter', () => { card.hovered = true; });
     element.addEventListener('pointermove', onMove);
-    element.addEventListener('pointerleave', onLeave);
-
-    element.addEventListener('touchstart', onEnter, { passive: true });
+    element.addEventListener('pointerleave', () => { card.hovered = false; card.tx = 0; card.ty = 0; });
     element.addEventListener('touchmove', onMove, { passive: true });
-    element.addEventListener('touchend', onLeave, { passive: true });
+    element.addEventListener('touchend', () => { card.hovered = false; card.tx = 0; card.ty = 0; });
 
-    this.cards.push(cardData);
-    this.startLoop();
-  }
-
-  initGyroscope() {
-    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      const unlockGyro = () => {
-        DeviceOrientationEvent.requestPermission()
-          .then((response) => {
-            if (response === 'granted') {
-              window.addEventListener('deviceorientation', this.orientationHandler);
-            }
-          })
-          .catch(() => {});
-        window.removeEventListener('click', unlockGyro);
-      };
-      window.addEventListener('click', unlockGyro);
-    } else if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', this.orientationHandler);
-    }
-  }
-
-  handleOrientation(e) {
-    if (!e.gamma || !e.beta) return;
-    const tiltX = Math.max(-15, Math.min(15, (e.beta - 45) * 0.3));
-    const tiltY = Math.max(-15, Math.min(15, e.gamma * 0.3));
-
-    this.cards.forEach((card) => {
-      if (!card.isHovered) {
-        card.targetX = -tiltX;
-        card.targetY = tiltY;
-        card.glareX = 50 + tiltY * 2;
-        card.glareY = 50 + tiltX * 2;
-        if (card.glareEl) card.glareEl.style.opacity = '0.35';
-      }
-    });
+    this.cards.push(card);
   }
 
   startLoop() {
-    if (this.isLooping) return;
-    this.isLooping = true;
-    const lerp = (s, e, f) => s + (e - s) * f;
-
     const render = () => {
-      this.cards.forEach((card) => {
-        card.currentX = lerp(card.currentX, card.targetX, 0.12);
-        card.currentY = lerp(card.currentY, card.targetY, 0.12);
-
-        const currentScale = card.isHovered ? card.config.scale : 1.0;
-        card.el.style.transform = `perspective(${card.config.perspective}px) rotateX(${card.currentX.toFixed(2)}deg) rotateY(${card.currentY.toFixed(2)}deg) scale3d(${currentScale}, ${currentScale}, 1)`;
-
-        if (card.glareEl) {
-          card.glareEl.style.background = `radial-gradient(circle at ${card.glareX.toFixed(1)}% ${card.glareY.toFixed(1)}%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.04) 45%, transparent 70%)`;
-        }
+      this.cards.forEach(c => {
+        c.cx += (c.tx - c.cx) * 0.12;
+        c.cy += (c.ty - c.cy) * 0.12;
+        const s = c.hovered ? c.config.scale : 1.0;
+        c.el.style.transform = `perspective(${c.config.perspective}px) rotateX(${c.cx.toFixed(2)}deg) rotateY(${c.cy.toFixed(2)}deg) scale3d(${s}, ${s}, 1)`;
       });
       requestAnimationFrame(render);
     };
@@ -488,7 +281,7 @@ class TiltEngine {
 }
 
 // --------------------------------------------------------------------------
-// 4. APPLE-STYLE CALENDAR VIEW
+// 4. CALENDAR MATRIX VIEW
 // --------------------------------------------------------------------------
 class CalendarView {
   constructor(containerId, onDateSelected) {
@@ -497,61 +290,33 @@ class CalendarView {
     this.currentDate = new Date();
     this.viewYear = this.currentDate.getFullYear();
     this.viewMonth = this.currentDate.getMonth();
-    this.selectedDateStr = this.formatDateStr(this.currentDate);
-    this.rosterMap = new Map();
+    this.weeks = [];
   }
 
-  setRosterData(rosterList) {
-    this.rosterMap.clear();
-    (rosterList || []).forEach(item => {
-      if (item.date) this.rosterMap.set(item.date, item);
-    });
+  setWeeks(weeks) {
+    this.weeks = weeks || [];
     this.render();
   }
 
-  formatDateStr(d) {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+  getWeekForDate(dateStr) {
+    return this.weeks.find(w => dateStr >= w.startDate && dateStr <= w.endDate);
   }
 
   prevMonth() {
     this.viewMonth--;
-    if (this.viewMonth < 0) {
-      this.viewMonth = 11;
-      this.viewYear--;
-    }
+    if (this.viewMonth < 0) { this.viewMonth = 11; this.viewYear--; }
     this.render();
   }
 
   nextMonth() {
     this.viewMonth++;
-    if (this.viewMonth > 11) {
-      this.viewMonth = 0;
-      this.viewYear++;
-    }
+    if (this.viewMonth > 11) { this.viewMonth = 0; this.viewYear++; }
     this.render();
-  }
-
-  goToday() {
-    const today = new Date();
-    this.viewYear = today.getFullYear();
-    this.viewMonth = today.getMonth();
-    this.selectedDateStr = this.formatDateStr(today);
-    this.render();
-    if (this.onDateSelected) {
-      this.onDateSelected(this.selectedDateStr, this.rosterMap.get(this.selectedDateStr));
-    }
   }
 
   render() {
     if (!this.container) return;
-
-    const monthNames = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
     const dayHeaders = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
     const firstDay = new Date(this.viewYear, this.viewMonth, 1);
@@ -559,43 +324,35 @@ class CalendarView {
     if (startDayOfWeek === -1) startDayOfWeek = 6;
 
     const daysInMonth = new Date(this.viewYear, this.viewMonth + 1, 0).getDate();
-    const daysInPrevMonth = new Date(this.viewYear, this.viewMonth, 0).getDate();
-    const todayStr = this.formatDateStr(this.currentDate);
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     let html = `
       <div class="calendar-header flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-xl font-semibold tracking-tight text-white/95">
+          <h2 class="text-xl font-bold tracking-tight text-white/95">
             ${monthNames[this.viewMonth]} <span class="text-white/40 font-mono text-base ml-1">${this.viewYear}</span>
           </h2>
         </div>
         <div class="flex items-center gap-1.5">
-          <button id="cal-today-btn" class="px-2.5 py-1 text-xs font-medium rounded-full bg-white/5 hover:bg-white/10 text-white/70 border border-white/10 active:scale-95 transition-all">
-            Bugün
-          </button>
           <button id="cal-prev-btn" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 border border-white/10 active:scale-95 transition-all">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
           </button>
           <button id="cal-next-btn" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 border border-white/10 active:scale-95 transition-all">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </button>
         </div>
       </div>
 
-      <div class="grid grid-cols-7 gap-1 text-center mb-1 text-[11px] font-medium tracking-wider text-white/40 uppercase">
+      <div class="grid grid-cols-7 gap-1 text-center mb-1.5 text-[11px] font-medium tracking-wider text-white/40 uppercase">
         ${dayHeaders.map(h => `<div>${h}</div>`).join('')}
       </div>
 
       <div class="grid grid-cols-7 gap-1">
     `;
 
-    for (let i = startDayOfWeek - 1; i >= 0; i--) {
-      const dayNum = daysInPrevMonth - i;
-      html += `
-        <div class="aspect-square p-1 rounded-xl flex flex-col items-center justify-center text-white/20 text-xs font-mono select-none">
-          ${dayNum}
-        </div>
-      `;
+    for (let i = 0; i < startDayOfWeek; i++) {
+      html += `<div class="aspect-square p-1 rounded-xl"></div>`;
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -603,36 +360,22 @@ class CalendarView {
       const dd = String(day).padStart(2, '0');
       const dateStr = `${this.viewYear}-${mm}-${dd}`;
       const isToday = dateStr === todayStr;
-      const isSelected = dateStr === this.selectedDateStr;
-      const rosterItem = this.rosterMap.get(dateStr);
+      const weekItem = this.getWeekForDate(dateStr);
 
-      const hasNobet = rosterItem && rosterItem.nobetci && rosterItem.nobetci !== 'Nöbetçi Belirtilmedi';
-      const hasIcap = rosterItem && rosterItem.icapci && rosterItem.icapci !== 'İcapçı Belirtilmedi';
+      const docCode = weekItem ? weekItem.activeCode : '';
+      const isChanged = weekItem && weekItem.isChanged;
 
       html += `
         <button data-date="${dateStr}" class="cal-day-cell relative aspect-square p-1 rounded-2xl flex flex-col items-center justify-center transition-all group ${
-          isSelected 
-            ? 'bg-white/15 ring-1.5 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.25)] text-white scale-[1.03] z-10' 
-            : isToday 
-              ? 'bg-white/[0.08] ring-1 ring-white/30 text-amber-300 font-semibold' 
-              : 'hover:bg-white/5 active:scale-95 text-white/80'
+          isToday ? 'bg-amber-400/15 ring-1.5 ring-amber-400 text-amber-300 font-bold' : 'hover:bg-white/10 bg-white/[0.03] text-white/80'
         }">
-          <span class="text-xs font-mono leading-none ${isToday ? 'font-bold text-amber-400' : ''}">${day}</span>
-          <div class="flex items-center gap-1 mt-1.5 h-1.5">
-            ${hasNobet ? '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]"></span>' : ''}
-            ${hasIcap ? '<span class="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]"></span>' : ''}
-          </div>
+          <span class="text-xs font-mono leading-none">${day}</span>
+          ${docCode ? `
+            <span class="text-[9px] mt-1 font-bold font-mono px-1 py-0.2 rounded ${
+              isChanged ? 'bg-sky-500/30 text-sky-300 border border-sky-400/40' : 'text-white/60'
+            }">${docCode}</span>
+          ` : ''}
         </button>
-      `;
-    }
-
-    const totalCells = startDayOfWeek + daysInMonth;
-    const remaining = (7 - (totalCells % 7)) % 7;
-    for (let i = 1; i <= remaining; i++) {
-      html += `
-        <div class="aspect-square p-1 rounded-xl flex flex-col items-center justify-center text-white/20 text-xs font-mono select-none">
-          ${i}
-        </div>
       `;
     }
 
@@ -641,43 +384,67 @@ class CalendarView {
 
     const prevBtn = this.container.querySelector('#cal-prev-btn');
     const nextBtn = this.container.querySelector('#cal-next-btn');
-    const todayBtn = this.container.querySelector('#cal-today-btn');
-
     if (prevBtn) prevBtn.addEventListener('click', () => this.prevMonth());
     if (nextBtn) nextBtn.addEventListener('click', () => this.nextMonth());
-    if (todayBtn) todayBtn.addEventListener('click', () => this.goToday());
 
     this.container.querySelectorAll('.cal-day-cell').forEach(btn => {
       btn.addEventListener('click', () => {
-        const targetDate = btn.getAttribute('data-date');
-        this.selectedDateStr = targetDate;
-        this.render();
-        if (this.onDateSelected) {
-          this.onDateSelected(targetDate, this.rosterMap.get(targetDate));
-        }
+        const dateStr = btn.getAttribute('data-date');
+        const week = this.getWeekForDate(dateStr);
+        if (this.onDateSelected) this.onDateSelected(dateStr, week);
       });
     });
+
+    if (window.lucide) lucide.createIcons();
   }
 }
 
 // --------------------------------------------------------------------------
-// 5. CORE VIGIL APP CONTROLLER
+// 5. MAIN VIGIL APPLICATION CONTROLLER
 // --------------------------------------------------------------------------
 class VigilApp {
   constructor() {
-    this.driveService = new DriveService();
+    this.directory = new DoctorDirectory();
+    this.driveService = new WeeklyDriveService(this.directory);
     this.tiltEngine = new TiltEngine();
-    this.roster = [];
-    this.currentFilter = 'all';
+    this.weeks = [];
+    this.activeNobetci = this.loadActiveNobetci();
 
     this.initElements();
     this.initTabs();
     this.initCalendar();
-    this.initSearch();
+    this.initDirectoryView();
     this.initSettings();
     this.initPwa();
     this.initCountdown();
-    this.loadRoster();
+    this.loadData();
+  }
+
+  loadActiveNobetci() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_NOBETCI);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    // Default to Dr. Yiğit Cirdi or first doctor
+    return {
+      code: "YC",
+      name: "Dr. Yiğit Cirdi",
+      role: "Klinik Nöbet Sorumlusu",
+      phone: ""
+    };
+  }
+
+  saveActiveNobetci(doc, customPhone) {
+    this.activeNobetci = {
+      code: doc.code,
+      name: doc.name,
+      role: "Klinik Nöbet Sorumlusu",
+      phone: customPhone || doc.phone || ""
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY_NOBETCI, JSON.stringify(this.activeNobetci));
+    } catch (e) {}
+    this.renderNobetciCard();
   }
 
   initElements() {
@@ -686,61 +453,64 @@ class VigilApp {
     this.refreshIcon = document.getElementById('refresh-icon');
     this.syncIndicator = document.getElementById('sync-indicator');
 
+    // Nöbetçi Card (ÜSTTE)
     this.cardNobetci = document.getElementById('card-nobetci');
-    this.cardIcapci = document.getElementById('card-icapci');
     this.nobetciNameEl = document.getElementById('today-nobetci-name');
-    this.nobetciRoleEl = document.getElementById('today-nobetci-role');
-    this.nobetciDeptEl = document.getElementById('today-nobetci-dept');
+    this.nobetciRoleText = document.getElementById('today-nobetci-role-text');
+    this.nobetciPhoneDisplay = document.getElementById('today-nobetci-phone-display');
     this.btnCallNobetci = document.getElementById('btn-call-nobetci');
+    this.btnWhatsappNobetci = document.getElementById('btn-whatsapp-nobetci');
     this.btnSmsNobetci = document.getElementById('btn-sms-nobetci');
+    this.btnQuickSelectNobet = document.getElementById('btn-quick-select-nobet');
 
+    // İcapçı Card (ALTTA)
+    this.cardIcapci = document.getElementById('card-icapci');
     this.icapciNameEl = document.getElementById('today-icapci-name');
-    this.icapciRoleEl = document.getElementById('today-icapci-role');
-    this.icapciDeptEl = document.getElementById('today-icapci-dept');
+    this.icapciRoleText = document.getElementById('today-icapci-role-text');
+    this.icapRangeBadge = document.getElementById('icap-range-badge');
+    this.icapWeekText = document.getElementById('icap-week-text');
+    this.icapChangeNotice = document.getElementById('icap-change-notice');
+    this.icapChangeText = document.getElementById('icap-change-text');
     this.btnCallIcapci = document.getElementById('btn-call-icapci');
+    this.btnWhatsappIcapci = document.getElementById('btn-whatsapp-icapci');
     this.btnSmsIcapci = document.getElementById('btn-sms-icapci');
 
-    this.notesBox = document.getElementById('today-notes-box');
-    this.notesText = document.getElementById('today-notes-text');
     this.upcomingList = document.getElementById('upcoming-list');
     this.btnShowCalendar = document.getElementById('btn-show-calendar');
 
-    this.calSelectedPreview = document.getElementById('cal-selected-preview');
-    this.calSelectedDateLabel = document.getElementById('cal-selected-date-label');
-    this.calSelectedDetails = document.getElementById('cal-selected-details');
+    // Nöbetçi Modal
+    this.nobetModal = document.getElementById('nobet-modal');
+    this.selectNobetciDoc = document.getElementById('select-nobetci-doc');
+    this.inputNobetciCustomPhone = document.getElementById('input-nobetci-custom-phone');
+    this.btnSaveNobetciChoice = document.getElementById('btn-save-nobetci-choice');
+    this.btnCloseNobetModal = document.getElementById('btn-close-nobet-modal');
 
-    this.searchInput = document.getElementById('search-input');
-    this.searchResultsList = document.getElementById('search-results-list');
-    this.searchResultsCount = document.getElementById('search-results-count');
-
-    this.inputSheetUrl = document.getElementById('input-sheet-url');
-    this.btnSaveSheet = document.getElementById('btn-save-sheet');
-    this.btnResetDemo = document.getElementById('btn-reset-demo');
-    this.syncStatusBadge = document.getElementById('sync-status-badge');
-    this.syncStatusTime = document.getElementById('sync-status-time');
-
+    // Details Modal
     this.daySheet = document.getElementById('day-sheet');
     this.sheetTitle = document.getElementById('sheet-title');
     this.sheetSubhead = document.getElementById('sheet-subhead');
     this.sheetBody = document.getElementById('sheet-body');
     this.btnCloseSheet = document.getElementById('btn-close-sheet');
 
-    this.iosBanner = document.getElementById('ios-install-banner');
-    this.btnCloseBanner = document.getElementById('btn-close-banner');
+    // Directory
+    this.doctorDirectoryList = document.getElementById('doctor-directory-list');
+    this.searchInput = document.getElementById('search-input');
 
-    if (this.cardNobetci) this.tiltEngine.attach(this.cardNobetci, { maxRotation: 9, scale: 1.02 });
-    if (this.cardIcapci) this.tiltEngine.attach(this.cardIcapci, { maxRotation: 8, scale: 1.015 });
+    // Attach 3D tilt
+    if (this.cardNobetci) this.tiltEngine.attach(this.cardNobetci, { maxRotation: 8 });
+    if (this.cardIcapci) this.tiltEngine.attach(this.cardIcapci, { maxRotation: 8 });
 
+    // Date
     const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     if (this.headerDateEl) {
-      this.headerDateEl.textContent = now.toLocaleDateString('tr-TR', options);
+      this.headerDateEl.textContent = now.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
 
+    // Refresh
     if (this.btnRefresh) {
       this.btnRefresh.addEventListener('click', () => {
         this.triggerHaptic();
-        this.loadRoster(true);
+        this.loadData(true);
       });
     }
 
@@ -748,10 +518,32 @@ class VigilApp {
       this.btnShowCalendar.addEventListener('click', () => this.switchTab('tab-calendar'));
     }
 
+    // Nöbetçi edit modal
+    if (this.btnQuickSelectNobet) {
+      this.btnQuickSelectNobet.addEventListener('click', () => this.openNobetciModal());
+    }
+    if (this.btnCloseNobetModal) {
+      this.btnCloseNobetModal.addEventListener('click', () => this.closeNobetciModal());
+    }
+    if (this.nobetModal) {
+      this.nobetModal.addEventListener('click', (e) => {
+        if (e.target === this.nobetModal) this.closeNobetciModal();
+      });
+    }
+    if (this.btnSaveNobetciChoice) {
+      this.btnSaveNobetciChoice.addEventListener('click', () => {
+        const code = this.selectNobetciDoc.value;
+        const doc = this.directory.getDoctor(code);
+        const customPhone = this.inputNobetciCustomPhone.value.trim();
+        this.saveActiveNobetci(doc, customPhone);
+        this.closeNobetciModal();
+        this.triggerHaptic();
+      });
+    }
+
     if (this.btnCloseSheet) {
       this.btnCloseSheet.addEventListener('click', () => this.closeBottomSheet());
     }
-
     if (this.daySheet) {
       this.daySheet.addEventListener('click', (e) => {
         if (e.target === this.daySheet) this.closeBottomSheet();
@@ -764,22 +556,20 @@ class VigilApp {
   }
 
   initTabs() {
-    const navButtons = document.querySelectorAll('.nav-btn');
-    navButtons.forEach((btn) => {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this.triggerHaptic();
-        const tabId = btn.getAttribute('data-tab');
-        this.switchTab(tabId);
+        this.switchTab(btn.getAttribute('data-tab'));
       });
     });
   }
 
   switchTab(tabId) {
-    document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-    const targetPane = document.getElementById(tabId);
-    if (targetPane) targetPane.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(tabId);
+    if (target) target.classList.add('active');
 
-    document.querySelectorAll('.nav-btn').forEach((btn) => {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
       const isTarget = btn.getAttribute('data-tab') === tabId;
       btn.classList.toggle('active', isTarget);
       if (isTarget) {
@@ -796,81 +586,45 @@ class VigilApp {
   }
 
   initCalendar() {
-    this.calendar = new CalendarView('calendar-root', (dateStr, dutyItem) => {
+    this.calendar = new CalendarView('calendar-root', (dateStr, week) => {
       this.triggerHaptic();
-      this.displayCalendarDetail(dateStr, dutyItem);
+      this.openDaySheet(dateStr, week);
     });
   }
 
-  initSearch() {
-    if (!this.searchInput) return;
-    this.searchInput.addEventListener('input', () => this.renderSearchResults());
-
-    const filterChips = document.querySelectorAll('.filter-chip');
-    filterChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        this.triggerHaptic();
-        filterChips.forEach((c) => {
-          c.classList.remove('bg-white/10', 'text-white', 'border-white/20');
-          c.classList.add('bg-white/5', 'text-white/70', 'border-white/10');
-        });
-        chip.classList.remove('bg-white/5', 'text-white/70', 'border-white/10');
-        chip.classList.add('bg-white/10', 'text-white', 'border-white/20');
-
-        this.currentFilter = chip.getAttribute('data-filter');
-        this.renderSearchResults();
-      });
-    });
+  initDirectoryView() {
+    this.renderDirectory();
+    if (this.searchInput) {
+      this.searchInput.addEventListener('input', () => this.renderDirectory());
+    }
   }
 
   initSettings() {
-    if (!this.inputSheetUrl) return;
-    const savedUrl = this.driveService.getSheetUrl();
-    if (savedUrl) this.inputSheetUrl.value = savedUrl;
+    const input = document.getElementById('input-sheet-url');
+    const saveBtn = document.getElementById('btn-save-sheet');
+    const resetBtn = document.getElementById('btn-reset-demo');
 
-    if (this.btnSaveSheet) {
-      this.btnSaveSheet.addEventListener('click', async () => {
+    if (input) input.value = this.driveService.getSheetUrl();
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
         this.triggerHaptic();
-        const val = this.inputSheetUrl.value.trim();
-        this.driveService.setSheetUrl(val);
-        await this.loadRoster(true);
+        this.driveService.setSheetUrl(input.value);
+        this.loadData(true);
       });
     }
-
-    if (this.btnResetDemo) {
-      this.btnResetDemo.addEventListener('click', async () => {
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
         this.triggerHaptic();
-        this.inputSheetUrl.value = '';
-        this.driveService.setSheetUrl('');
-        await this.loadRoster(true);
+        input.value = DEFAULT_SHEET_URL;
+        this.driveService.setSheetUrl(DEFAULT_SHEET_URL);
+        this.loadData(true);
       });
     }
   }
 
   initPwa() {
-    // Only register SW over http: or https:
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-      });
-    }
-
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-    let dismissed = false;
-    try {
-      dismissed = sessionStorage.getItem('vigil_banner_dismissed') === 'true';
-    } catch (e) {}
-
-    if (isIos && !isStandalone && !dismissed && this.iosBanner) {
-      this.iosBanner.classList.remove('hidden');
-    }
-
-    if (this.btnCloseBanner) {
-      this.btnCloseBanner.addEventListener('click', () => {
-        if (this.iosBanner) this.iosBanner.classList.add('hidden');
-        try { sessionStorage.setItem('vigil_banner_dismissed', 'true'); } catch (e) {}
-      });
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   }
 
@@ -878,361 +632,350 @@ class VigilApp {
     const timerEl = document.getElementById('countdown-timer');
     if (!timerEl) return;
 
-    const updateCountdown = () => {
+    const update = () => {
       const now = new Date();
       const target = new Date(now);
-      if (now.getHours() >= 8) {
-        target.setDate(target.getDate() + 1);
-      }
+      if (now.getHours() >= 8) target.setDate(target.getDate() + 1);
       target.setHours(8, 0, 0, 0);
 
       const diff = target - now;
-      if (diff <= 0) {
-        timerEl.textContent = "00:00:00";
-        return;
-      }
+      if (diff <= 0) { timerEl.textContent = "00:00:00"; return; }
 
-      const h = Math.floor(diff / (1000 * 60 * 60));
-      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const s = Math.floor((diff % (1000 * 60)) / 1000);
-
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
       timerEl.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     };
-
-    updateCountdown();
-    setInterval(updateCountdown, 1000);
+    update();
+    setInterval(update, 1000);
   }
 
-  async loadRoster(forceRefresh = false) {
+  async loadData(forceRefresh = false) {
     if (this.refreshIcon) this.refreshIcon.classList.add('animate-spin');
 
-    try {
-      const result = await this.driveService.fetchRoster(forceRefresh);
-      this.roster = result.data || [];
+    const result = await this.driveService.fetchWeeklyRoster();
+    this.weeks = result.weeks || [];
 
-      if (this.syncIndicator) {
-        if (result.source === 'cloud') {
-          this.syncIndicator.textContent = 'DRIVE';
-          if (this.syncStatusBadge) {
-            this.syncStatusBadge.textContent = 'Google E-Tablo Bağlı';
-            this.syncStatusBadge.className = 'font-mono text-emerald-400 font-semibold';
-          }
-        } else if (result.source === 'cache') {
-          this.syncIndicator.textContent = 'ÖNBELLEK';
-          if (this.syncStatusBadge) {
-            this.syncStatusBadge.textContent = 'Önbellek (Offline Hazır)';
-            this.syncStatusBadge.className = 'font-mono text-sky-400 font-semibold';
-          }
-        } else {
-          this.syncIndicator.textContent = 'DEMO';
-          if (this.syncStatusBadge) {
-            this.syncStatusBadge.textContent = 'Demo Modu Aktif';
-            this.syncStatusBadge.className = 'font-mono text-amber-400 font-semibold';
-          }
+    const badge = document.getElementById('sync-status-badge');
+    const timeEl = document.getElementById('sync-status-time');
+    if (badge) {
+      badge.textContent = result.source === 'cloud' ? 'Google E-Tablo Bağlı' : 'Yerel Önbellek';
+      badge.className = result.source === 'cloud' ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-sky-400 font-semibold';
+    }
+    if (timeEl) {
+      timeEl.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    this.renderNobetciCard();
+    this.renderIcapciCard();
+    this.renderUpcomingWeeks();
+    if (this.calendar) this.calendar.setWeeks(this.weeks);
+    this.renderDirectory();
+
+    if (this.refreshIcon) {
+      setTimeout(() => this.refreshIcon.classList.remove('animate-spin'), 400);
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  cleanPhone(phone) {
+    if (!phone) return '';
+    return phone.replace(/[^0-9+]/g, '');
+  }
+
+  renderNobetciCard() {
+    const doc = this.activeNobetci;
+    if (this.nobetciNameEl) this.nobetciNameEl.textContent = doc.name;
+    if (this.nobetciRoleText) this.nobetciRoleText.textContent = doc.role || 'Klinik Nöbet Sorumlusu';
+    
+    const phoneClean = this.cleanPhone(doc.phone);
+    if (this.nobetciPhoneDisplay) {
+      this.nobetciPhoneDisplay.textContent = doc.phone ? `Telefon: ${doc.phone}` : 'Telefon rehberden eklenebilir';
+    }
+
+    // Call button
+    if (this.btnCallNobetci) {
+      if (phoneClean) {
+        this.btnCallNobetci.href = `tel:${phoneClean}`;
+        this.btnCallNobetci.classList.remove('opacity-60');
+      } else {
+        this.btnCallNobetci.href = "#";
+        this.btnCallNobetci.onclick = (e) => {
+          e.preventDefault();
+          this.openNobetciModal();
+        };
+      }
+    }
+
+    // WhatsApp
+    if (this.btnWhatsappNobetci) {
+      const waNumber = phoneClean.replace(/^\+/, '');
+      this.btnWhatsappNobetci.href = phoneClean 
+        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam iyi nöbetler, servisten arıyorum.')}` 
+        : '#';
+    }
+
+    // SMS
+    if (this.btnSmsNobetci) {
+      this.btnSmsNobetci.href = phoneClean ? `sms:${phoneClean}` : '#';
+    }
+  }
+
+  getTodayWeek() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    let week = this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
+    if (!week && this.weeks.length > 0) {
+      // Find closest upcoming week
+      week = this.weeks.find(w => w.startDate >= todayStr) || this.weeks[0];
+    }
+    return week;
+  }
+
+  renderIcapciCard() {
+    const week = this.getTodayWeek();
+    if (!week) return;
+
+    // Refresh live doctor data from directory in case phone was updated
+    const liveDoc = this.directory.getDoctor(week.activeCode);
+    const scheduledDoc = this.directory.getDoctor(week.scheduledCode);
+
+    if (this.icapciNameEl) this.icapciNameEl.textContent = liveDoc.name;
+    if (this.icapRangeBadge) this.icapRangeBadge.textContent = week.rangeText;
+    if (this.icapWeekText) this.icapWeekText.textContent = `${week.rangeText} (Haftalık İcap)`;
+
+    // Change notice
+    if (this.icapChangeNotice) {
+      if (week.isChanged) {
+        this.icapChangeNotice.classList.remove('hidden');
+        if (this.icapChangeText) {
+          this.icapChangeText.textContent = `Değişim: Asıl İcapçı ${scheduledDoc.name} yerine ${liveDoc.name} görevde.`;
         }
-      }
-
-      const lastSync = result.lastSync || new Date();
-      if (this.syncStatusTime) {
-        this.syncStatusTime.textContent = lastSync.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-      }
-
-      this.renderTodayView();
-      if (this.calendar) this.calendar.setRosterData(this.roster);
-      this.renderSearchResults();
-
-    } catch (e) {
-      console.error('Roster fetch error:', e);
-    } finally {
-      if (this.refreshIcon) {
-        setTimeout(() => this.refreshIcon.classList.remove('animate-spin'), 400);
-      }
-      if (window.lucide) lucide.createIcons();
-    }
-  }
-
-  getTodayStr() {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  renderTodayView() {
-    const todayStr = this.getTodayStr();
-    let todayItem = this.roster.find((r) => r.date === todayStr);
-
-    if (!todayItem && this.roster.length > 0) {
-      todayItem = this.roster[0];
-    }
-
-    if (todayItem) {
-      if (this.nobetciNameEl) this.nobetciNameEl.textContent = todayItem.nobetci || 'Belirtilmedi';
-      if (this.nobetciRoleEl) this.nobetciRoleEl.textContent = todayItem.nobetciRole || 'Nöbetçi Hekim';
-      if (this.nobetciDeptEl) this.nobetciDeptEl.querySelector('span').textContent = todayItem.nobetciDept || 'Genel Nöbet Servisi';
-      
-      const nobetPhone = (todayItem.nobetciPhone || '').replace(/\s+/g, '');
-      if (this.btnCallNobetci) this.btnCallNobetci.href = nobetPhone ? `tel:${nobetPhone}` : '#';
-      if (this.btnSmsNobetci) this.btnSmsNobetci.href = nobetPhone ? `sms:${nobetPhone}` : '#';
-
-      if (this.icapciNameEl) this.icapciNameEl.textContent = todayItem.icapci || 'Belirtilmedi';
-      if (this.icapciRoleEl) this.icapciRoleEl.textContent = todayItem.icapciRole || 'İcapçı Uzman';
-      if (this.icapciDeptEl) this.icapciDeptEl.querySelector('span').textContent = todayItem.icapciDept || 'Konsültasyon Hizmeti';
-
-      const icapPhone = (todayItem.icapciPhone || '').replace(/\s+/g, '');
-      if (this.btnCallIcapci) this.btnCallIcapci.href = icapPhone ? `tel:${icapPhone}` : '#';
-      if (this.btnSmsIcapci) this.btnSmsIcapci.href = icapPhone ? `sms:${icapPhone}` : '#';
-
-      if (this.notesText) {
-        this.notesText.textContent = todayItem.notes || "Özel bir nöbet notu bulunmamaktadır. Vardiya saatleri 08:00 - 08:00 arasındadır.";
+      } else {
+        this.icapChangeNotice.classList.add('hidden');
       }
     }
 
-    this.renderUpcomingHorizon(todayStr);
+    const phoneClean = this.cleanPhone(liveDoc.phone);
+
+    // Call Button
+    if (this.btnCallIcapci) {
+      if (phoneClean) {
+        this.btnCallIcapci.href = `tel:${phoneClean}`;
+        this.btnCallIcapci.classList.remove('opacity-60');
+      } else {
+        this.btnCallIcapci.href = "#";
+        this.btnCallIcapci.onclick = (e) => {
+          e.preventDefault();
+          this.switchTab('tab-search'); // Go to directory to enter phone
+        };
+      }
+    }
+
+    // WhatsApp
+    if (this.btnWhatsappIcapci) {
+      const waNumber = phoneClean.replace(/^\+/, '');
+      this.btnWhatsappIcapci.href = phoneClean 
+        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam merhaba, bugünkü icap göreviniz için klinikten arıyorum.')}` 
+        : '#';
+    }
+
+    // SMS
+    if (this.btnSmsIcapci) {
+      this.btnSmsIcapci.href = phoneClean ? `sms:${phoneClean}` : '#';
+    }
   }
 
-  renderUpcomingHorizon(todayStr) {
+  renderUpcomingWeeks() {
     if (!this.upcomingList) return;
-    const upcoming = this.roster.filter((r) => r.date > todayStr).slice(0, 5);
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const upcoming = this.weeks.filter(w => w.endDate >= todayStr).slice(0, 6);
+
     if (!upcoming.length) {
-      this.upcomingList.innerHTML = `
-        <div class="glass-panel p-4 text-center text-xs text-white/40 font-mono">
-          Yaklaşan nöbet kaydı bulunamadı.
-        </div>
-      `;
+      this.upcomingList.innerHTML = `<div class="p-4 text-center text-xs text-white/40 font-mono">Kayıt bulunamadı.</div>`;
       return;
     }
 
-    this.upcomingList.innerHTML = upcoming.map((item) => {
-      const d = new Date(item.date + 'T00:00:00');
-      const dayName = d.toLocaleDateString('tr-TR', { weekday: 'short' });
-      const dayNum = d.getDate();
-      const monthName = d.toLocaleDateString('tr-TR', { month: 'short' });
+    this.upcomingList.innerHTML = upcoming.map((w, idx) => {
+      const isCurrent = todayStr >= w.startDate && todayStr <= w.endDate;
+      const liveDoc = this.directory.getDoctor(w.activeCode);
+      const isChanged = w.isChanged;
 
       return `
-        <div data-inspect-date="${item.date}" class="upcoming-card glass-panel p-3.5 flex items-center justify-between hover:bg-white/[0.06] active:scale-[0.98] cursor-pointer transition-all">
+        <div data-week-idx="${idx}" class="glass-panel p-3.5 flex items-center justify-between hover:bg-white/[0.06] active:scale-[0.98] cursor-pointer transition-all">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex flex-col items-center justify-center shrink-0">
-              <span class="text-[10px] uppercase font-mono text-white/40">${monthName}</span>
-              <span class="text-base font-bold text-white leading-none">${dayNum}</span>
-              <span class="text-[9px] uppercase font-medium text-amber-400/90">${dayName}</span>
+              <span class="text-[9px] uppercase font-mono text-white/40">İCAP</span>
+              <span class="text-sm font-bold ${isCurrent ? 'text-amber-400' : 'text-sky-300'} leading-none mt-0.5">${w.activeCode}</span>
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-white/95">${item.nobetci}</span>
-                <span class="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-500/15 text-amber-400 font-mono">NÖBET</span>
+                <span class="text-sm font-bold text-white">${liveDoc.name}</span>
+                ${isCurrent ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 font-mono font-bold">BU HAFTA</span>' : ''}
+                ${isChanged ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-sky-500/20 text-sky-400 font-mono">DEĞİŞİM</span>' : ''}
               </div>
-              <div class="flex items-center gap-2 mt-0.5">
-                <span class="text-[11px] text-white/60">${item.icapci}</span>
-                <span class="text-[9px] px-1.5 py-0.2 rounded-md bg-sky-500/15 text-sky-400 font-mono">İCAP</span>
-              </div>
+              <p class="text-xs text-white/50 font-mono mt-0.5">${w.rangeText}</p>
             </div>
           </div>
-          <div class="text-white/30 pl-2">
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
+          ${liveDoc.phone ? `
+            <a href="tel:${this.cleanPhone(liveDoc.phone)}" class="w-9 h-9 rounded-full bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center active:scale-90 transition-all">
+              <i data-lucide="phone" class="w-4 h-4"></i>
+            </a>
+          ` : `
+            <div class="text-white/20 pr-1">
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </div>
+          `}
         </div>
       `;
     }).join('');
 
-    this.upcomingList.querySelectorAll('.upcoming-card').forEach((card) => {
-      card.addEventListener('click', () => {
-        this.triggerHaptic();
-        const dateStr = card.getAttribute('data-inspect-date');
-        const dutyItem = this.roster.find((r) => r.date === dateStr);
-        this.openBottomSheet(dateStr, dutyItem);
-      });
-    });
-  }
-
-  displayCalendarDetail(dateStr, dutyItem) {
-    if (!this.calSelectedDateLabel) return;
-    const d = new Date(dateStr + 'T00:00:00');
-    const fullDate = d.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    this.calSelectedDateLabel.textContent = fullDate;
-
-    if (!dutyItem) {
-      this.calSelectedDetails.innerHTML = `
-        <div class="text-xs text-white/40 py-2 text-center font-mono">
-          Bu tarihe ait nöbet kaydı bulunmamaktadır.
-        </div>
-      `;
-      return;
-    }
-
-    this.calSelectedDetails.innerHTML = `
-      <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
-        <div>
-          <span class="text-[10px] uppercase font-mono text-amber-400 font-bold">NÖBETÇİ</span>
-          <div class="text-sm font-bold text-white">${dutyItem.nobetci}</div>
-          <div class="text-xs text-white/60">${dutyItem.nobetciRole}</div>
-        </div>
-        ${dutyItem.nobetciPhone ? `
-          <a href="tel:${dutyItem.nobetciPhone.replace(/\s+/g, '')}" class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center hover:bg-amber-500/30">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-          </a>
-        ` : ''}
-      </div>
-
-      <div class="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-between">
-        <div>
-          <span class="text-[10px] uppercase font-mono text-sky-400 font-bold">İCAPÇI</span>
-          <div class="text-sm font-bold text-white">${dutyItem.icapci}</div>
-          <div class="text-xs text-white/60">${dutyItem.icapciRole}</div>
-        </div>
-        ${dutyItem.icapciPhone ? `
-          <a href="tel:${dutyItem.icapciPhone.replace(/\s+/g, '')}" class="w-8 h-8 rounded-full bg-sky-500/20 text-sky-300 flex items-center justify-center hover:bg-sky-500/30">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-          </a>
-        ` : ''}
-      </div>
-    `;
-
     if (window.lucide) lucide.createIcons();
   }
 
-  renderSearchResults() {
-    if (!this.searchResultsList) return;
+  renderDirectory() {
+    if (!this.doctorDirectoryList) return;
     const q = (this.searchInput ? this.searchInput.value : '').toLowerCase().trim();
-    const filter = this.currentFilter;
+    const all = this.directory.getAll();
 
-    let filtered = this.roster.filter((r) => {
-      const matchQuery = !q || 
-        (r.nobetci && r.nobetci.toLowerCase().includes(q)) ||
-        (r.nobetciRole && r.nobetciRole.toLowerCase().includes(q)) ||
-        (r.nobetciDept && r.nobetciDept.toLowerCase().includes(q)) ||
-        (r.icapci && r.icapci.toLowerCase().includes(q)) ||
-        (r.icapciRole && r.icapciRole.toLowerCase().includes(q)) ||
-        (r.icapciDept && r.icapciDept.toLowerCase().includes(q)) ||
-        (r.date && r.date.includes(q));
-      
-      return matchQuery;
-    });
+    const filtered = all.filter(d => 
+      !q || d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q) || (d.phone && d.phone.includes(q))
+    );
 
-    if (this.searchResultsCount) {
-      this.searchResultsCount.textContent = `${filtered.length} kayıt listeleniyor`;
-    }
-
-    if (!filtered.length) {
-      this.searchResultsList.innerHTML = `
-        <div class="glass-panel p-6 text-center text-white/40 text-xs font-mono">
-          Eşleşen nöbet kaydı bulunamadı.
-        </div>
-      `;
-      return;
-    }
-
-    this.searchResultsList.innerHTML = filtered.map((item) => {
-      const d = new Date(item.date + 'T00:00:00');
-      const dateFormatted = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' });
-
-      const showNobet = filter === 'all' || filter === 'nobet';
-      const showIcap = filter === 'all' || filter === 'icap';
+    this.doctorDirectoryList.innerHTML = filtered.map(d => {
+      const phoneClean = this.cleanPhone(d.phone);
 
       return `
         <div class="glass-panel p-4 space-y-3">
-          <div class="flex items-center justify-between border-b border-white/[0.08] pb-2">
-            <span class="text-xs font-mono text-white/70 font-semibold">${dateFormatted}</span>
-            <span class="text-[10px] text-white/40 font-mono">${item.date}</span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-mono font-bold text-amber-400 text-sm">
+                ${d.code}
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">${d.name}</h4>
+                <p class="text-[11px] text-white/50">${d.role}</p>
+              </div>
+            </div>
+            ${phoneClean ? `
+              <div class="flex items-center gap-1.5">
+                <a href="tel:${phoneClean}" class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center active:scale-95 transition-all">
+                  <i data-lucide="phone" class="w-4 h-4"></i>
+                </a>
+                <a href="https://wa.me/${phoneClean.replace(/^\+/, '')}" target="_blank" class="w-8 h-8 rounded-xl bg-white/10 text-white/70 border border-white/10 flex items-center justify-center active:scale-95 transition-all">
+                  <i data-lucide="message-circle" class="w-4 h-4"></i>
+                </a>
+              </div>
+            ` : ''}
           </div>
 
-          ${showNobet ? `
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="text-[9px] uppercase tracking-wider font-mono font-bold text-amber-400">NÖBETÇİ</span>
-                <div class="text-sm font-semibold text-white">${item.nobetci}</div>
-                <div class="text-[11px] text-white/50">${item.nobetciRole || ''}</div>
-              </div>
-              ${item.nobetciPhone ? `
-                <a href="tel:${item.nobetciPhone.replace(/\s+/g, '')}" class="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5 active:scale-95 transition-all">
-                  <i data-lucide="phone" class="w-3.5 h-3.5"></i>
-                  <span>Ara</span>
-                </a>
-              ` : ''}
-            </div>
-          ` : ''}
-
-          ${showIcap ? `
-            <div class="flex items-center justify-between ${showNobet ? 'pt-2 border-t border-white/[0.04]' : ''}">
-              <div>
-                <span class="text-[9px] uppercase tracking-wider font-mono font-bold text-sky-400">İCAPÇI</span>
-                <div class="text-sm font-semibold text-white">${item.icapci}</div>
-                <div class="text-[11px] text-white/50">${item.icapciRole || ''}</div>
-              </div>
-              ${item.icapciPhone ? `
-                <a href="tel:${item.icapciPhone.replace(/\s+/g, '')}" class="px-2.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs flex items-center gap-1.5 active:scale-95 transition-all">
-                  <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                  <span>İcapçı</span>
-                </a>
-              ` : ''}
-            </div>
-          ` : ''}
+          <!-- Phone Number Input & Save -->
+          <div class="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
+            <input 
+              type="tel" 
+              data-doc-code="${d.code}"
+              value="${d.phone || ''}" 
+              placeholder="Telefon: 05xx xxx xx xx" 
+              class="doc-phone-input flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-white/30 focus:outline-none focus:border-amber-400"
+            />
+            <button data-save-doc="${d.code}" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs text-white/80 font-medium transition-all">
+              Kaydet
+            </button>
+          </div>
         </div>
       `;
     }).join('');
 
+    // Attach save events
+    this.doctorDirectoryList.querySelectorAll('[data-save-doc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.getAttribute('data-save-doc');
+        const input = this.doctorDirectoryList.querySelector(`.doc-phone-input[data-doc-code="${code}"]`);
+        if (input) {
+          this.directory.updateDoctor(code, null, input.value.trim());
+          btn.textContent = 'Kaydedildi ✓';
+          btn.classList.add('text-emerald-400');
+          setTimeout(() => {
+            btn.textContent = 'Kaydet';
+            btn.classList.remove('text-emerald-400');
+          }, 1500);
+          this.triggerHaptic();
+          this.renderNobetciCard();
+          this.renderIcapciCard();
+        }
+      });
+    });
+
     if (window.lucide) lucide.createIcons();
   }
 
-  openBottomSheet(dateStr, item) {
+  openNobetciModal() {
+    if (!this.nobetModal) return;
+    const docs = this.directory.getAll();
+    this.selectNobetciDoc.innerHTML = docs.map(d => `
+      <option value="${d.code}" ${d.code === this.activeNobetci.code ? 'selected' : ''}>
+        ${d.name} (${d.code})
+      </option>
+    `).join('');
+
+    this.inputNobetciCustomPhone.value = this.activeNobetci.phone || '';
+    this.nobetModal.classList.add('open');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  closeNobetciModal() {
+    if (this.nobetModal) this.nobetModal.classList.remove('open');
+  }
+
+  openDaySheet(dateStr, week) {
     if (!this.daySheet) return;
     const d = new Date(dateStr + 'T00:00:00');
     const fullDate = d.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    if (this.sheetTitle) this.sheetTitle.textContent = fullDate;
-    if (this.sheetSubhead) this.sheetSubhead.textContent = `${item ? item.notes || 'Vardiya Detayı' : 'Kayıt Detayı'}`;
+    this.sheetTitle.textContent = fullDate;
+    this.sheetSubhead.textContent = week ? `İcap Haftası: ${week.rangeText}` : 'Gün Detayı';
 
-    if (!item) {
-      if (this.sheetBody) this.sheetBody.innerHTML = `<div class="text-center py-4 text-white/40 text-xs">Kayıt bulunamadı.</div>`;
+    if (!week) {
+      this.sheetBody.innerHTML = `<div class="py-4 text-center text-white/40 text-xs font-mono">Bu tarihe ait icap kaydı bulunamadı.</div>`;
       this.daySheet.classList.add('open');
       return;
     }
 
-    if (this.sheetBody) {
-      this.sheetBody.innerHTML = `
-        <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs uppercase font-mono font-bold text-amber-400 tracking-wider">NÖBETÇİ HEKİM</span>
-            <span class="text-[11px] font-mono text-white/40">08:00 - 08:00</span>
-          </div>
-          <div>
-            <h4 class="text-lg font-bold text-white">${item.nobetci}</h4>
-            <p class="text-xs text-amber-300/80">${item.nobetciRole || 'Nöbetçi Hekim'}</p>
-          </div>
-          <div class="flex items-center gap-2 pt-1">
-            <a href="tel:${(item.nobetciPhone || '').replace(/\s+/g, '')}" class="action-btn action-btn-primary flex-1 py-2 text-xs">
-              <i data-lucide="phone" class="w-3.5 h-3.5"></i>
-              <span>Ara</span>
-            </a>
-            <a href="sms:${(item.nobetciPhone || '').replace(/\s+/g, '')}" class="action-btn action-btn-secondary flex-1 py-2 text-xs">
-              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
-              <span>SMS</span>
-            </a>
-          </div>
-        </div>
+    const liveDoc = this.directory.getDoctor(week.activeCode);
+    const scheduledDoc = this.directory.getDoctor(week.scheduledCode);
+    const phoneClean = this.cleanPhone(liveDoc.phone);
 
-        <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs uppercase font-mono font-bold text-sky-400 tracking-wider">İCAPÇI HEKİM</span>
-            <span class="text-[11px] font-mono text-white/40">Çağrı Üzerine</span>
-          </div>
-          <div>
-            <h4 class="text-lg font-bold text-white">${item.icapci}</h4>
-            <p class="text-xs text-sky-300/80">${item.icapciRole || 'İcapçı Uzman'}</p>
-          </div>
-          <div class="flex items-center gap-2 pt-1">
-            <a href="tel:${(item.icapciPhone || '').replace(/\s+/g, '')}" class="action-btn action-btn-secondary flex-1 py-2 text-xs border-sky-500/30 text-sky-300">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-              <span>İcapçıyı Ara</span>
-            </a>
-            <a href="sms:${(item.icapciPhone || '').replace(/\s+/g, '')}" class="action-btn action-btn-secondary flex-1 py-2 text-xs">
-              <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
-              <span>Mesaj</span>
-            </a>
-          </div>
+    this.sheetBody.innerHTML = `
+      <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs uppercase font-mono font-bold text-sky-400">BU HAFTANIN İCAPÇISI</span>
+          <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
         </div>
-      `;
-    }
+        <div>
+          <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
+          <p class="text-xs text-sky-300/80">${liveDoc.role}</p>
+          ${week.isChanged ? `<p class="text-[11px] text-sky-400/70 mt-1">Asıl İcapçı: ${scheduledDoc.name} (Değişim uygulandı)</p>` : ''}
+        </div>
+        <div class="pt-2">
+          ${phoneClean ? `
+            <a href="tel:${phoneClean}" class="call-btn-large call-btn-icap py-3">
+              <i data-lucide="phone-call" class="w-4 h-4"></i>
+              <span>İCAPÇIYI ARA (${liveDoc.name})</span>
+            </a>
+          ` : `
+            <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon numarası rehberden eklenebilir.</div>
+          `}
+        </div>
+      </div>
+    `;
 
     this.daySheet.classList.add('open');
     if (window.lucide) lucide.createIcons();
