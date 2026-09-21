@@ -724,7 +724,9 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=2.8').then(reg => {
+        reg.update();
+      }).catch(() => {});
     }
   }
 

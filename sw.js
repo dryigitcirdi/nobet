@@ -1,14 +1,10 @@
-const CACHE_NAME = 'vigil-cache-v1';
+const CACHE_NAME = 'vigil-cache-v2.8';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './assets/css/style.css',
   './assets/js/app.js',
-  './assets/js/driveService.js',
-  './assets/js/calendarView.js',
-  './assets/js/tiltEffect.js',
-  './assets/js/mockData.js',
   './assets/icons/apple-touch-icon.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
@@ -16,10 +12,11 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -37,10 +34,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-first strategy: always fetch fresh from network, fall back to cache when offline
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // If request is for Google Sheets or external dynamic data, try network first, then fall back to cache/offline
+  // External APIs (Google Sheets)
   if (url.hostname.includes('google') || url.hostname.includes('googleapis')) {
     event.respondWith(
       fetch(event.request)
@@ -54,18 +52,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Local assets: Stale-While-Revalidate
+  // App core assets: Network first, cache fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
