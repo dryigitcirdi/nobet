@@ -9,12 +9,12 @@
 // 1. KLİNİK HEKİM REHBERİ (DOKTORLAR & TELEFONLAR)
 // --------------------------------------------------------------------------
 const INITIAL_DOCTORS = {
+  "KS": { code: "KS", name: "Dr. Kerim Sarıyılmaz", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "YC": { code: "YC", name: "Dr. Yiğit Umur Cırdı", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "BA": { code: "BA", name: "Dr. Burak Akan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "KÖ": { code: "KÖ", name: "Dr. Korhan Özkan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "SG": { code: "SG", name: "Dr. Safa Gürsoy", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "UA": { code: "UA", name: "Dr. Umut Akgün", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "YC": { code: "YC", name: "Dr. Yiğit Cirdi", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "KS": { code: "KS", name: "Dr. Kerim S.", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "KÖ": { code: "KÖ", name: "Dr. KÖ", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "BA": { code: "BA", name: "Dr. BA", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "SG": { code: "SG", name: "Dr. SG", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "EK": { code: "EK", name: "Dr. EK", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "DG": { code: "DG", name: "Dr. DG", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "AB": { code: "AB", name: "Dr. AB", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
@@ -31,13 +31,23 @@ class DoctorDirectory {
   }
 
   load() {
+    let docs = { ...INITIAL_DOCTORS };
     try {
       const saved = localStorage.getItem(STORAGE_KEY_DOCTORS);
       if (saved) {
-        return { ...INITIAL_DOCTORS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        for (const k in docs) {
+          if (parsed[k]) {
+            if (parsed[k].phone) docs[k].phone = parsed[k].phone;
+            // Preserve user-customized names if they don't look like generic abbreviations
+            if (parsed[k].name && !parsed[k].name.startsWith("Dr. " + k) && !INITIAL_DOCTORS[k]) {
+              docs[k].name = parsed[k].name;
+            }
+          }
+        }
       }
     } catch (e) {}
-    return { ...INITIAL_DOCTORS };
+    return docs;
   }
 
   save() {
@@ -428,7 +438,7 @@ class VigilApp {
     // Default to Dr. Yiğit Cirdi or first doctor
     return {
       code: "YC",
-      name: "Dr. Yiğit Cirdi",
+      name: "Dr. Yiğit Umur Cırdı",
       role: "Klinik Nöbet Sorumlusu",
       phone: ""
     };
@@ -753,7 +763,7 @@ class VigilApp {
       if (week.isChanged) {
         this.icapChangeNotice.classList.remove('hidden');
         if (this.icapChangeText) {
-          this.icapChangeText.textContent = `Değişim: Asıl İcapçı ${scheduledDoc.name} yerine ${liveDoc.name} görevde.`;
+          this.icapChangeText.textContent = `Kongre / Değişim: Asıl İcapçı ${scheduledDoc.name} yerine ${liveDoc.name} görevde.`;
         }
       } else {
         this.icapChangeNotice.classList.add('hidden');
