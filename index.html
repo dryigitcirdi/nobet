@@ -280,13 +280,12 @@
       <div class="relative">
         <i data-lucide="search" class="w-4 h-4 text-white/40 absolute left-4 top-1/2 -translate-y-1/2"></i>
         <input 
-          id="search-input"
+          id="search-input" 
           type="search" 
-          placeholder="Hekim adı veya kod (UA, YC...) ara..." 
+          placeholder="Hekim adı ara (Dr. Yiğit, Dr. Umut, Dr. Korhan...)" 
           class="w-full bg-white/[0.05] border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/40 focus:outline-none focus:border-amber-400/60 focus:bg-white/[0.08] transition-all"
         />
       </div>
-
       <!-- Doctor Directory List -->
       <div id="doctor-directory-list" class="space-y-2.5">
         <!-- Dynamically rendered doctor cards with editable phone inputs -->
@@ -352,8 +351,8 @@
         <h4 class="text-xs uppercase font-mono tracking-wider text-amber-400/90 font-semibold">İcap Kural Mantığı</h4>
         <ul class="text-xs text-white/70 space-y-1.5 list-disc list-inside leading-relaxed">
           <li><b>Tarih Aralığı:</b> Pazartesi-Pazar haftalık 7 günlük bloklar halinde okunur.</li>
-          <li><b>Asıl İcapçı:</b> D sütunundaki doktor kodudur (UA, YC, BA, SG, KS, KÖ vb.).</li>
-          <li><b>Değişim Kuralı:</b> E sütununda (veya değişim sütununda) bir hekim kodu varsa sistem otomatik olarak o kişiyi aktif icapçı yapar.</li>
+          <li><b>Asıl İcapçı:</b> D sütunundaki planlanan hekimdir (Dr. Umut Akgün, Dr. Yiğit Umur Cırdı, Dr. Korhan Özkan vb.).</li>
+          <li><b>Değişim Kuralı:</b> E sütununda bir hekim kodu/ismi varsa otomatik olarak o hekim aktif icapçı yapılır. E-tabloda kısaltmalar yer alsa dahi uygulamada hekimlerin tam adları görüntülenir.</li>
         </ul>
       </div>
 
