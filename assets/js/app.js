@@ -679,7 +679,7 @@ class VigilApp {
       <div class="flex items-center justify-between">
         <div>
           <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
-          <p class="text-xs text-sky-300/80 font-medium">İcapçı Hekim</p>
+          <p class="text-xs text-sky-300/80 font-medium">İcap Sorumlu Hekimi</p>
           <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText} (Haftalık İcap)</p>
         </div>
         ${phoneClean ? `
@@ -851,7 +851,7 @@ class VigilApp {
     if (this.icapciNameEl) this.icapciNameEl.textContent = liveDoc.name;
     if (this.icapRangeBadge) this.icapRangeBadge.textContent = week.rangeText;
     if (this.icapWeekText) this.icapWeekText.textContent = `${week.rangeText} (Haftalık İcap)`;
-    if (this.icapciRoleText) this.icapciRoleText.textContent = "İcapçı Hekim";
+    if (this.icapciRoleText) this.icapciRoleText.textContent = "İcap Sorumlu Hekimi";
 
     const phoneClean = this.cleanPhone(liveDoc.phone);
 
@@ -1056,12 +1056,12 @@ class VigilApp {
     this.sheetBody.innerHTML = `
       <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-xs uppercase font-mono font-bold text-sky-400">İCAPÇI HEKİM</span>
+          <span class="text-xs uppercase font-mono font-bold text-sky-400">İCAP SORUMLU HEKİMİ</span>
           <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
         </div>
         <div>
           <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
-          <p class="text-xs text-sky-300/80">İcapçı Hekim</p>
+          <p class="text-xs text-sky-300/80">İcap Sorumlu Hekimi</p>
         </div>
         <div class="pt-2">
           ${phoneClean ? `
