@@ -1,8 +1,8 @@
 /**
  * ==========================================================================
- * VIGIL — Klinik Nöbet & İcap Portalı Engine (v2.6)
+ * VIGIL — Klinik Nöbet & İcap Portalı Engine (v2.7)
  * Configured for Dr. Umut Akgün, Dr. Yiğit Umur Cırdı & Ortopedi Kliniği
- * Tam Hekim İsimleri Öncelikli Sistem
+ * Doğrudan Aktif Nöbetçi & İcapçı Hekim Odaklı Sistem
  * ==========================================================================
  */
 
@@ -35,7 +35,6 @@ class DoctorDirectory {
   load() {
     let docs = JSON.parse(JSON.stringify(INITIAL_DOCTORS));
     try {
-      // Check v3 or migrate from v2
       const saved = localStorage.getItem(STORAGE_KEY_DOCTORS) || localStorage.getItem('vigil_doctors_directory_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -43,7 +42,6 @@ class DoctorDirectory {
           const item = parsed[k];
           if (docs[k]) {
             if (item.phone) docs[k].phone = item.phone;
-            // Only preserve user-customized name if it is not just an abbreviation or default prefix
             if (item.name && 
                 !item.name.endsWith(k) && 
                 item.name.length > 6 && 
@@ -73,16 +71,13 @@ class DoctorDirectory {
     const upper = raw.toUpperCase();
     const trUpper = raw.toLocaleUpperCase('tr-TR');
 
-    // Direct exact matches
     if (this.doctors[upper]) return this.doctors[upper];
     if (this.doctors[trUpper]) return this.doctors[trUpper];
 
-    // Korhan Özkan alias normalization
     if (trUpper === 'KÖ' || upper === 'KO' || raw === 'KÖ' || raw === 'KO' || raw.toLowerCase().includes('korhan')) {
       return this.doctors['KÖ'] || this.doctors['KO'];
     }
 
-    // Name matching
     for (const k in this.doctors) {
       const doc = this.doctors[k];
       if (doc.name.toLocaleLowerCase('tr-TR').includes(raw.toLocaleLowerCase('tr-TR')) ||
@@ -116,7 +111,6 @@ class DoctorDirectory {
   }
 
   getAll() {
-    // Unique doctors by full name in defined priority order
     const unique = new Map();
     const priorityCodes = ["YC", "UA", "KÖ", "BA", "KS", "SG", "EK", "DG", "AB"];
     
@@ -211,7 +205,10 @@ class WeeklyDriveService {
         const note = getCell(5);
         const extraChange = getCell(6);
 
-        // Helper to determine if a cell contains a doctor indicator vs non-doctor words like "bayram"
+        // Determine who the active icap doctor is:
+        // Priority 1: Column E (changeCode) if not empty/non-doctor note
+        // Priority 2: Column G (extraChange) if not empty/non-doctor note
+        // Fallback: Column D (scheduledCode)
         const isDoctorValue = (val) => {
           if (!val) return false;
           const clean = val.trim();
@@ -223,22 +220,13 @@ class WeeklyDriveService {
           return true;
         };
 
-        // Kural:
-        // 1. Normalde icapçı D sütunudur (scheduledCode).
-        // 2. Ancak E sütununda (changeCode) bir isim/kod varsa kongre/değişim olmuştur, E sütunu aktiftir!
-        // 3. E boş ise G sütunundaki ek değişim kontrol edilir (Örn: KS yerine EK, DG, AB).
         let activeCode = scheduledCode;
-        let isChanged = false;
-
         if (isDoctorValue(changeCode)) {
           activeCode = changeCode;
-          isChanged = true;
         } else if (isDoctorValue(extraChange)) {
           activeCode = extraChange;
-          isChanged = true;
         }
 
-        const scheduledDoc = this.directory.getDoctor(scheduledCode);
         const activeDoc = this.directory.getDoctor(activeCode);
 
         roster.push({
@@ -247,14 +235,9 @@ class WeeklyDriveService {
           startDateObj: parsedStart.dateObj,
           endDateObj: parsedEnd.dateObj,
           rangeText: `${startStr} – ${endStr}`,
-          scheduledCode,
-          changeCode,
-          extraChange,
           activeCode,
-          isChanged,
-          scheduledDoctor: scheduledDoc,
           activeDoctor: activeDoc,
-          notes: note || (extraChange && !isDoctorValue(extraChange) ? extraChange : '')
+          notes: note || ''
         });
       });
 
@@ -295,10 +278,7 @@ class WeeklyDriveService {
         startDateObj: start,
         endDateObj: end,
         rangeText: `${fmt(start)} – ${fmt(end)}`,
-        scheduledCode: code,
         activeCode: code,
-        isChanged: false,
-        scheduledDoctor: doc,
         activeDoctor: doc,
         notes: ''
       });
@@ -358,7 +338,7 @@ class TiltEngine {
 }
 
 // --------------------------------------------------------------------------
-// 4. CALENDAR MATRIX VIEW (TAM İSİM & KISA AD DESTEKLİ)
+// 4. CALENDAR MATRIX VIEW (O ANKİ İCAPÇI ODAKLI)
 // --------------------------------------------------------------------------
 class CalendarView {
   constructor(containerId, directory, onDateSelected) {
@@ -442,7 +422,6 @@ class CalendarView {
 
       const liveDoc = weekItem ? this.directory.getDoctor(weekItem.activeCode) : null;
       const shortDisplay = liveDoc ? (liveDoc.shortName || liveDoc.name.replace('Dr. ', '')) : '';
-      const isChanged = weekItem && weekItem.isChanged;
 
       html += `
         <button data-date="${dateStr}" class="cal-day-cell relative aspect-square p-1 rounded-2xl flex flex-col items-center justify-between transition-all group ${
@@ -450,9 +429,7 @@ class CalendarView {
         }">
           <span class="text-xs font-mono leading-none pt-0.5">${day}</span>
           ${shortDisplay ? `
-            <span class="text-[8.5px] leading-tight font-medium px-1 py-0.5 rounded w-full text-center truncate ${
-              isChanged ? 'bg-sky-500/25 text-sky-300 border border-sky-400/30 font-bold' : 'text-white/75 bg-white/[0.04]'
-            }" title="${liveDoc.name}">${shortDisplay}</span>
+            <span class="text-[8.5px] leading-tight font-medium px-1 py-0.5 rounded w-full text-center truncate text-white/75 bg-white/[0.04]" title="${liveDoc.name}">${shortDisplay}</span>
           ` : '<span class="h-2"></span>'}
         </button>
       `;
@@ -504,23 +481,21 @@ class VigilApp {
       const saved = localStorage.getItem(STORAGE_KEY_NOBETCI) || localStorage.getItem('vigil_active_nobetci_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Refresh name from directory to ensure full doctor name
         const doc = this.directory.getDoctor(parsed.code || 'YC');
         return {
           code: doc.code,
           name: doc.name,
-          role: "Klinik Nöbet Sorumlusu",
+          role: "Nöbetçi Hekim",
           phone: parsed.phone || doc.phone || ""
         };
       }
     } catch (e) {}
     
-    // Default to Dr. Yiğit Umur Cırdı
     const def = this.directory.getDoctor('YC');
     return {
       code: def.code,
       name: def.name,
-      role: "Klinik Nöbet Sorumlusu",
+      role: "Nöbetçi Hekim",
       phone: def.phone || ""
     };
   }
@@ -529,7 +504,7 @@ class VigilApp {
     this.activeNobetci = {
       code: doc.code,
       name: doc.name,
-      role: "Klinik Nöbet Sorumlusu",
+      role: "Nöbetçi Hekim",
       phone: customPhone || doc.phone || ""
     };
     try {
@@ -560,8 +535,6 @@ class VigilApp {
     this.icapciRoleText = document.getElementById('today-icapci-role-text');
     this.icapRangeBadge = document.getElementById('icap-range-badge');
     this.icapWeekText = document.getElementById('icap-week-text');
-    this.icapChangeNotice = document.getElementById('icap-change-notice');
-    this.icapChangeText = document.getElementById('icap-change-text');
     this.btnCallIcapci = document.getElementById('btn-call-icapci');
     this.btnWhatsappIcapci = document.getElementById('btn-whatsapp-icapci');
     this.btnSmsIcapci = document.getElementById('btn-sms-icapci');
@@ -700,23 +673,14 @@ class VigilApp {
     }
 
     const liveDoc = this.directory.getDoctor(week.activeCode);
-    const scheduledDoc = this.directory.getDoctor(week.scheduledCode);
     const phoneClean = this.cleanPhone(liveDoc.phone);
 
     detailsContainer.innerHTML = `
       <div class="flex items-center justify-between">
         <div>
-          <div class="flex items-center gap-2">
-            <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
-            ${week.isChanged ? '<span class="text-[9px] px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-400 font-mono font-semibold">DEĞİŞİM</span>' : ''}
-          </div>
-          <p class="text-xs text-sky-300/80 font-medium">${liveDoc.role}</p>
+          <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
+          <p class="text-xs text-sky-300/80 font-medium">İcapçı Hekim</p>
           <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText} (Haftalık İcap)</p>
-          ${week.isChanged ? `
-            <p class="text-[11px] text-sky-400 font-medium mt-1">
-              Asıl İcapçı: ${scheduledDoc.name} ➔ Değişim: <b>${liveDoc.name}</b>
-            </p>
-          ` : ''}
         </div>
         ${phoneClean ? `
           <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${liveDoc.name} Ara">
@@ -828,7 +792,7 @@ class VigilApp {
   renderNobetciCard() {
     const doc = this.activeNobetci;
     if (this.nobetciNameEl) this.nobetciNameEl.textContent = doc.name;
-    if (this.nobetciRoleText) this.nobetciRoleText.textContent = doc.role || 'Klinik Nöbet Sorumlusu';
+    if (this.nobetciRoleText) this.nobetciRoleText.textContent = "Nöbetçi Hekim";
     
     const phoneClean = this.cleanPhone(doc.phone);
     if (this.nobetciPhoneDisplay) {
@@ -872,7 +836,6 @@ class VigilApp {
 
     let week = this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
     if (!week && this.weeks.length > 0) {
-      // Find closest upcoming week
       week = this.weeks.find(w => w.startDate >= todayStr) || this.weeks[0];
     }
     return week;
@@ -882,25 +845,13 @@ class VigilApp {
     const week = this.getTodayWeek();
     if (!week) return;
 
-    // Refresh live doctor data from directory in case phone was updated
+    // Refresh live doctor data from directory
     const liveDoc = this.directory.getDoctor(week.activeCode);
-    const scheduledDoc = this.directory.getDoctor(week.scheduledCode);
 
     if (this.icapciNameEl) this.icapciNameEl.textContent = liveDoc.name;
     if (this.icapRangeBadge) this.icapRangeBadge.textContent = week.rangeText;
     if (this.icapWeekText) this.icapWeekText.textContent = `${week.rangeText} (Haftalık İcap)`;
-
-    // Change notice (Değişim bildirimi tam isimlerle)
-    if (this.icapChangeNotice) {
-      if (week.isChanged) {
-        this.icapChangeNotice.classList.remove('hidden');
-        if (this.icapChangeText) {
-          this.icapChangeText.textContent = `Kongre / Değişim: Asıl İcapçı ${scheduledDoc.name} yerine ${liveDoc.name} görevde.`;
-        }
-      } else {
-        this.icapChangeNotice.classList.add('hidden');
-      }
-    }
+    if (this.icapciRoleText) this.icapciRoleText.textContent = "İcapçı Hekim";
 
     const phoneClean = this.cleanPhone(liveDoc.phone);
 
@@ -913,7 +864,7 @@ class VigilApp {
         this.btnCallIcapci.href = "#";
         this.btnCallIcapci.onclick = (e) => {
           e.preventDefault();
-          this.switchTab('tab-search'); // Go to directory to enter phone
+          this.switchTab('tab-search');
         };
       }
     }
@@ -922,7 +873,7 @@ class VigilApp {
     if (this.btnWhatsappIcapci) {
       const waNumber = phoneClean.replace(/^\+/, '');
       this.btnWhatsappIcapci.href = phoneClean 
-        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam merhaba, bugünkü icap göreviniz için klinikten arıyorum.')}` 
+        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam merhaba, icap göreviniz için klinikten arıyorum.')}` 
         : '#';
     }
 
@@ -950,8 +901,6 @@ class VigilApp {
     this.upcomingList.innerHTML = upcoming.map((w, idx) => {
       const isCurrent = todayStr >= w.startDate && todayStr <= w.endDate;
       const liveDoc = this.directory.getDoctor(w.activeCode);
-      const scheduledDoc = this.directory.getDoctor(w.scheduledCode);
-      const isChanged = w.isChanged;
       const phoneClean = this.cleanPhone(liveDoc.phone);
 
       return `
@@ -961,25 +910,16 @@ class VigilApp {
               <div class="w-11 h-11 rounded-2xl ${
                 isCurrent 
                   ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400' 
-                  : isChanged 
-                    ? 'bg-sky-500/15 border border-sky-500/30 text-sky-300' 
-                    : 'bg-white/[0.05] border border-white/10 text-white/70'
+                  : 'bg-white/[0.05] border border-white/10 text-white/70'
               } flex items-center justify-center shrink-0">
-                <i data-lucide="${isCurrent ? 'radio' : isChanged ? 'arrow-left-right' : 'user-check'}" class="w-5 h-5"></i>
+                <i data-lucide="${isCurrent ? 'radio' : 'user-check'}" class="w-5 h-5"></i>
               </div>
               <div>
-                <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
                   <span class="text-sm font-bold text-white tracking-tight">${liveDoc.name}</span>
                   ${isCurrent ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 font-mono font-bold">BU HAFTA</span>' : ''}
-                  ${isChanged ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-sky-500/20 text-sky-400 font-mono font-semibold">DEĞİŞİM</span>' : ''}
                 </div>
                 <p class="text-xs text-white/50 font-mono mt-0.5">${w.rangeText}</p>
-                ${isChanged ? `
-                  <p class="text-[11px] text-sky-400 font-medium mt-1 flex items-center gap-1.5">
-                    <i data-lucide="arrow-right" class="w-3 h-3 text-sky-400/80"></i>
-                    <span>Asıl: ${scheduledDoc.name} ➔ Değişim: <b>${liveDoc.name}</b></span>
-                  </p>
-                ` : ''}
               </div>
             </div>
             ${phoneClean ? `
@@ -1111,24 +1051,17 @@ class VigilApp {
     }
 
     const liveDoc = this.directory.getDoctor(week.activeCode);
-    const scheduledDoc = this.directory.getDoctor(week.scheduledCode);
     const phoneClean = this.cleanPhone(liveDoc.phone);
 
     this.sheetBody.innerHTML = `
       <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-xs uppercase font-mono font-bold text-sky-400">BU HAFTANIN İCAPÇISI</span>
+          <span class="text-xs uppercase font-mono font-bold text-sky-400">İCAPÇI HEKİM</span>
           <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
         </div>
         <div>
           <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
-          <p class="text-xs text-sky-300/80">${liveDoc.role}</p>
-          ${week.isChanged ? `
-            <p class="text-[11px] text-sky-400 font-medium mt-1.5 flex items-center gap-1.5">
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-sky-400/80"></i>
-              <span>Asıl İcapçı: ${scheduledDoc.name} ➔ Değişim: <b>${liveDoc.name}</b></span>
-            </p>
-          ` : ''}
+          <p class="text-xs text-sky-300/80">İcapçı Hekim</p>
         </div>
         <div class="pt-2">
           ${phoneClean ? `
