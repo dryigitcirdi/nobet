@@ -1,0 +1,9 @@
+credentials.json
+token.json
+*.py
+*.ps1
+auth_url.txt
+test_*.json
+google_sheets_bridge.json
+.system_generated/
+scratch/

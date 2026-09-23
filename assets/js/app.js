@@ -10,20 +10,26 @@
 // 1. KLİNİK HEKİM REHBERİ (DOKTORLAR & TELEFONLAR)
 // --------------------------------------------------------------------------
 const INITIAL_DOCTORS = {
-  "YC": { code: "YC", name: "Dr. Yiğit Umur Cırdı", shortName: "Dr. Yiğit", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "ÜT": { code: "ÜT", name: "Dr. Üzeyir Tırmık", shortName: "Dr. Üzeyir", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0532 468 27 60" },
+  "YC": { code: "YC", name: "Dr. Yiğit Umur Cırdı", shortName: "Dr. Yiğit", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0535 354 09 99" },
+  "HFC": { code: "HFC", name: "Dr. H. Faruk Cırmayın", shortName: "Dr. Faruk", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0554 944 28 80" },
+  "EK": { code: "EK", name: "Dr. Enes Kanay", shortName: "Dr. Enes", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0555 622 91 59" },
+  "FB": { code: "FB", name: "Dr. Faruk Balkan", shortName: "Dr. Faruk", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0539 760 12 97" },
+  "DG": { code: "DG", name: "Dr. Danyal Gümüş", shortName: "Dr. Danyal", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0506 741 53 57" },
+  "İK": { code: "İK", name: "Dr. İsmail Kalkar", shortName: "Dr. İsmail", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0507 040 40 64" },
+  "KK": { code: "KK", name: "Dr. Korkut Kasapbaşı", shortName: "Dr. Korkut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0532 497 58 60" },
+  "HK": { code: "HK", name: "Dr. Hasan Kara", shortName: "Dr. Hasan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0544 532 35 55" },
+  "ATB": { code: "ATB", name: "Dr. Alp Er Tunga Bölükbaşı", shortName: "Dr. Alp Er Tunga", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0530 496 80 77" },
+  "SR": { code: "SR", name: "Dr. Servin Rafi", shortName: "Dr. Servin", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "UA": { code: "UA", name: "Dr. Umut Akgün", shortName: "Dr. Umut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "KÖ": { code: "KÖ", name: "Dr. Korhan Özkan", shortName: "Dr. Korhan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "KO": { code: "KÖ", name: "Dr. Korhan Özkan", shortName: "Dr. Korhan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "BA": { code: "BA", name: "Dr. Burak Akan", shortName: "Dr. Burak", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "KS": { code: "KS", name: "Dr. Kerim Sarıyılmaz", shortName: "Dr. Kerim", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "EK": { code: "EK", name: "Dr. EK", shortName: "Dr. EK", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "DG": { code: "DG", name: "Dr. DG", shortName: "Dr. DG", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "AB": { code: "AB", name: "Dr. AB", shortName: "Dr. AB", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
+  "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
 };
 
-const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v3';
-const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v3';
+const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v4';
+const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v4';
 const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url_v2';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
 
@@ -152,7 +158,18 @@ class WeeklyDriveService {
 
   parseDmy(str) {
     if (!str) return null;
-    const m = String(str).trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    const s = String(str).trim();
+    const dateMatch = s.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (dateMatch) {
+      const yyyy = dateMatch[1];
+      const mm = String(parseInt(dateMatch[2], 10) + 1).padStart(2, '0');
+      const dd = String(dateMatch[3]).padStart(2, '0');
+      return {
+        iso: `${yyyy}-${mm}-${dd}`,
+        dateObj: new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10))
+      };
+    }
+    const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
     if (!m) return null;
     const dd = m[1].padStart(2, '0');
     const mm = m[2].padStart(2, '0');
@@ -255,6 +272,51 @@ class WeeklyDriveService {
         weeks: this.generateFallbackWeeks(),
         lastSync: new Date()
       };
+    }
+  }
+
+  async fetchDailyNobetRoster() {
+    const { sheetId } = this.extractSheetIdAndGid(this.sheetUrl);
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=1558096373`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+      const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);?/);
+      if (!match || !match[1]) return null;
+
+      const json = JSON.parse(match[1]);
+      const rows = json.table.rows || [];
+      const dailyMap = {};
+
+      rows.forEach(r => {
+        if (!r || !r.c) return;
+        const getCell = (idx) => {
+          if (!r.c[idx]) return '';
+          return (r.c[idx].f || r.c[idx].v || '').toString().trim();
+        };
+
+        const dateStr = getCell(0);
+        const nobetciRaw = getCell(2);
+        const phoneRaw = getCell(4);
+        if (dateStr && nobetciRaw) {
+          const parsed = this.parseDmy(dateStr);
+          if (parsed) {
+            dailyMap[parsed.iso] = {
+              dateStr,
+              iso: parsed.iso,
+              nobetciRaw,
+              phone: phoneRaw
+            };
+          }
+        }
+      });
+
+      return dailyMap;
+    } catch (e) {
+      console.warn('Daily nobet roster fetch error:', e);
+      return null;
     }
   }
 
@@ -667,28 +729,56 @@ class VigilApp {
     const fullDate = d.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     if (labelContainer) labelContainer.textContent = fullDate;
 
-    if (!week) {
-      detailsContainer.innerHTML = `<div class="py-3 text-center text-xs font-mono text-white/40">Bu tarihte kayıtlı icap bulunmuyor.</div>`;
-      return;
+    const dailyItem = this.dailyNobetMap ? this.dailyNobetMap[dateStr] : null;
+    let dailyHtml = '';
+    if (dailyItem) {
+      const dailyDoc = this.directory.getDoctor(dailyItem.nobetciRaw);
+      const dailyPhone = this.cleanPhone(dailyItem.phone || dailyDoc.phone);
+      dailyHtml = `
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+          <div>
+            <div class="flex items-center gap-1.5 mb-0.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <p class="text-xs text-amber-400 font-semibold uppercase tracking-wider">Nöbetçi Hekim</p>
+            </div>
+            <h4 class="text-base font-bold text-white">${dailyDoc.name || dailyItem.nobetciRaw}</h4>
+            ${dailyPhone ? `<p class="text-[11px] text-white/50 font-mono mt-0.5">${dailyItem.phone || dailyDoc.phone}</p>` : ''}
+          </div>
+          ${dailyPhone ? `
+            <a href="tel:${dailyPhone}" class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${dailyDoc.name} Ara">
+              <i data-lucide="phone-call" class="w-5 h-5"></i>
+            </a>
+          ` : ''}
+        </div>
+      `;
     }
 
-    const liveDoc = this.directory.getDoctor(week.activeCode);
-    const phoneClean = this.cleanPhone(liveDoc.phone);
-
-    detailsContainer.innerHTML = `
-      <div class="flex items-center justify-between">
-        <div>
-          <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
-          <p class="text-xs text-sky-300/80 font-medium">İcap Sorumlu Hekimi</p>
-          <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText} (Haftalık İcap)</p>
+    let icapHtml = '';
+    if (week) {
+      const liveDoc = this.directory.getDoctor(week.activeCode);
+      const phoneClean = this.cleanPhone(liveDoc.phone);
+      icapHtml = `
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5 mb-0.5">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+              <p class="text-xs text-sky-300/80 font-semibold uppercase tracking-wider">İcap Sorumlu Hekimi</p>
+            </div>
+            <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
+            <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText}</p>
+          </div>
+          ${phoneClean ? `
+            <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${liveDoc.name} Ara">
+              <i data-lucide="phone-call" class="w-5 h-5"></i>
+            </a>
+          ` : ''}
         </div>
-        ${phoneClean ? `
-          <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${liveDoc.name} Ara">
-            <i data-lucide="phone-call" class="w-5 h-5"></i>
-          </a>
-        ` : ''}
-      </div>
-    `;
+      `;
+    } else if (!dailyHtml) {
+      icapHtml = `<div class="py-3 text-center text-xs font-mono text-white/40">Bu tarihte kayıtlı nöbet veya icap bulunmuyor.</div>`;
+    }
+
+    detailsContainer.innerHTML = dailyHtml + icapHtml;
     if (window.lucide) lucide.createIcons();
   }
 
@@ -724,7 +814,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=2.8').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=2.9').then(reg => {
         reg.update();
       }).catch(() => {});
     }
@@ -755,14 +845,33 @@ class VigilApp {
   async loadData(forceRefresh = false) {
     if (this.refreshIcon) this.refreshIcon.classList.add('animate-spin');
 
-    const result = await this.driveService.fetchWeeklyRoster();
-    this.weeks = result.weeks || [];
+    const [weeklyResult, dailyRoster] = await Promise.all([
+      this.driveService.fetchWeeklyRoster(),
+      this.driveService.fetchDailyNobetRoster()
+    ]);
+
+    this.weeks = weeklyResult.weeks || [];
+    this.dailyNobetMap = dailyRoster || {};
+
+    // Auto-update activeNobetci from sheet if today has a daily duty assigned
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (this.dailyNobetMap && this.dailyNobetMap[todayStr]) {
+      const todayDaily = this.dailyNobetMap[todayStr];
+      const doc = this.directory.getDoctor(todayDaily.nobetciRaw);
+      this.activeNobetci = {
+        code: doc.code || 'NOBET',
+        name: doc.name || todayDaily.nobetciRaw,
+        role: "Nöbetçi Hekim",
+        phone: todayDaily.phone || doc.phone || ""
+      };
+    }
 
     const badge = document.getElementById('sync-status-badge');
     const timeEl = document.getElementById('sync-status-time');
     if (badge) {
-      badge.textContent = result.source === 'cloud' ? 'Google E-Tablo Bağlı' : 'Yerel Önbellek';
-      badge.className = result.source === 'cloud' ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-sky-400 font-semibold';
+      badge.textContent = weeklyResult.source === 'cloud' ? 'Google E-Tablo Bağlı' : 'Yerel Önbellek';
+      badge.className = weeklyResult.source === 'cloud' ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-sky-400 font-semibold';
     }
     if (timeEl) {
       timeEl.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -776,8 +885,6 @@ class VigilApp {
 
     // Auto-select today in calendar details
     const todayWeek = this.getTodayWeek();
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     this.renderCalendarSelectedDay(todayStr, todayWeek);
 
     if (this.refreshIcon) {
@@ -1044,40 +1151,70 @@ class VigilApp {
     const d = new Date(dateStr + 'T00:00:00');
     const fullDate = d.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     this.sheetTitle.textContent = fullDate;
-    this.sheetSubhead.textContent = week ? `İcap Haftası: ${week.rangeText}` : 'Gün Detayı';
+    this.sheetSubhead.textContent = 'Günün Görevli Hekimleri';
 
-    if (!week) {
-      this.sheetBody.innerHTML = `<div class="py-4 text-center text-white/40 text-xs font-mono">Bu tarihe ait icap kaydı bulunamadı.</div>`;
-      this.daySheet.classList.add('open');
-      return;
+    const dailyItem = this.dailyNobetMap ? this.dailyNobetMap[dateStr] : null;
+    let contentHtml = '';
+
+    if (dailyItem) {
+      const dailyDoc = this.directory.getDoctor(dailyItem.nobetciRaw);
+      const phoneClean = this.cleanPhone(dailyItem.phone || dailyDoc.phone);
+      contentHtml += `
+        <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3 mb-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs uppercase font-mono font-bold text-amber-400">GÜNLÜK NÖBETÇİ HEKİM</span>
+            <span class="text-[11px] font-mono text-white/40">24 Saat</span>
+          </div>
+          <div>
+            <h4 class="text-xl font-bold text-white">${dailyDoc.name || dailyItem.nobetciRaw}</h4>
+            <p class="text-xs text-amber-300/80">Ortopedi Nöbetçisi</p>
+          </div>
+          <div class="pt-2">
+            ${phoneClean ? `
+              <a href="tel:${phoneClean}" class="call-btn-large call-btn-nobet py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold transition-all">
+                <i data-lucide="phone-call" class="w-4 h-4"></i>
+                <span>NÖBETÇİYİ ARA (${dailyDoc.shortName || dailyDoc.name})</span>
+              </a>
+            ` : `
+              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon rehberden aranabilir.</div>
+            `}
+          </div>
+        </div>
+      `;
     }
 
-    const liveDoc = this.directory.getDoctor(week.activeCode);
-    const phoneClean = this.cleanPhone(liveDoc.phone);
+    if (week) {
+      const liveDoc = this.directory.getDoctor(week.activeCode);
+      const phoneClean = this.cleanPhone(liveDoc.phone);
+      contentHtml += `
+        <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs uppercase font-mono font-bold text-sky-400">İCAP SORUMLU HEKİMİ</span>
+            <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
+          </div>
+          <div>
+            <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
+            <p class="text-xs text-sky-300/80">İcap Sorumlu Hekimi</p>
+          </div>
+          <div class="pt-2">
+            ${phoneClean ? `
+              <a href="tel:${phoneClean}" class="call-btn-large call-btn-icap py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-sky-500 hover:bg-sky-400 text-neutral-950 font-bold transition-all">
+                <i data-lucide="phone-call" class="w-4 h-4"></i>
+                <span>İCAPÇIYI ARA (${liveDoc.shortName || liveDoc.name})</span>
+              </a>
+            ` : `
+              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon numarası rehberden eklenebilir.</div>
+            `}
+          </div>
+        </div>
+      `;
+    }
 
-    this.sheetBody.innerHTML = `
-      <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="text-xs uppercase font-mono font-bold text-sky-400">İCAP SORUMLU HEKİMİ</span>
-          <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
-        </div>
-        <div>
-          <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
-          <p class="text-xs text-sky-300/80">İcap Sorumlu Hekimi</p>
-        </div>
-        <div class="pt-2">
-          ${phoneClean ? `
-            <a href="tel:${phoneClean}" class="call-btn-large call-btn-icap py-3">
-              <i data-lucide="phone-call" class="w-4 h-4"></i>
-              <span>İCAPÇIYI ARA (${liveDoc.name})</span>
-            </a>
-          ` : `
-            <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon numarası rehberden eklenebilir.</div>
-          `}
-        </div>
-      </div>
-    `;
+    if (!dailyItem && !week) {
+      contentHtml = `<div class="py-4 text-center text-white/40 text-xs font-mono">Bu tarihe ait nöbet veya icap kaydı bulunamadı.</div>`;
+    }
 
+    this.sheetBody.innerHTML = contentHtml;
     this.daySheet.classList.add('open');
     if (window.lucide) lucide.createIcons();
   }

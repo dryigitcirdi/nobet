@@ -1,15 +1,10 @@
 /**
  * ==========================================================================
  * Google Sheets Otomatik Nöbet Listesi Oluşturucu (2026 - 2029)
- * 3 Yıllık Çizelge (01.10.2026 – 31.12.2029)
+ * - Sadece Tarih sütunu aylara göre renkli
+ * - Cumartesi ve Pazar satırı gri ve kalın (bold)
+ * - Nöbetçi Hekim sütunu tamamen beyaz
  * ==========================================================================
- * 
- * NASIL KULLANILIR?
- * 1. Google E-Tablonuzu açın (https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit)
- * 2. Üst menüden "Uzantılar" (Extensions) -> "Apps Script" seçeneğine tıklayın.
- * 3. Açılan editördeki mevcut kodu silip bu dosyadaki tüm kodu yapıştırın.
- * 4. Üstteki "Çalıştır" (Run) butonuna basın ve izinleri onaylayın.
- * 5. Tablonuzda "Nöbet Listesi (2026-2029)" sayfası otomatik olarak renklendirilip hazır hale gelecektir!
  */
 
 function nobetListesiOlustur() {
@@ -23,7 +18,7 @@ function nobetListesiOlustur() {
     sheet.clear();
   }
   
-  // 1. Başlık Satırı
+  // 1. Başlık Satırı (Koyu Slate / Füme)
   const headers = [["Tarih", "Gün", "Nöbetçi Hekim"]];
   const headerRange = sheet.getRange("A1:C1");
   headerRange.setValues(headers);
@@ -31,36 +26,37 @@ function nobetListesiOlustur() {
   headerRange.setFontSize(11);
   headerRange.setFontFamily("Segoe UI");
   headerRange.setFontColor("#FFFFFF");
-  headerRange.setBackground("#1E293B"); // Koyu Füme / Slate
+  headerRange.setBackground("#1E293B");
   headerRange.setHorizontalAlignment("center");
   headerRange.setVerticalAlignment("middle");
   sheet.setRowHeight(1, 36);
   
-  // 2. Türkçe Gün İsimleri
   const gunIsimleri = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
   
-  // 3. Ay Renk Kodları (Ayları birbirinden ayıran zarif pastel tonlar)
+  // 2. Ay Renk Kodları (Sadece Tarih Sütunu İçin Pastel Tonlar)
   const ayRenkleri = {
     0:  "#EFF6FF", // Ocak: Buz Mavisi
     1:  "#FFF1F2", // Şubat: Açık Gül
-    2:  "#F0FDFA", // Mart: Su Yeşili / Camgöbeği
+    2:  "#F0FDFA", // Mart: Su Yeşili
     3:  "#EEF2FF", // Nisan: Açık İndigo
-    4:  "#FEFCE8", // Mayıs: Sıcak Amber
-    5:  "#ECFDF5", // Haziran: Zümrüt Nane
+    4:  "#FEFCE8", // Mayıs: Açık Amber
+    5:  "#ECFDF5", // Haziran: Zümrüt
     6:  "#FFF7ED", // Temmuz: Şeftali
-    7:  "#E0F2FE", // Ağustos: Açık Gökyüzü
-    8:  "#FAF5FF", // Eylül: Açık Mor / Leylak
+    7:  "#E0F2FE", // Ağustos: Gökyüzü
+    8:  "#FAF5FF", // Eylül: Leylak
     9:  "#ECFEFF", // Ekim: Kristal Cyan
     10: "#FEF3C7", // Kasım: Sıcak Kum
     11: "#F0FDF4"  // Aralık: Kış Nanesi
   };
   
-  const haftaSonuGri = "#CBD5E1"; // Cumartesi & Pazar Gri Vurgusu (#CBD5E1)
-  const haftaSonuKoyuGri = "#0F172A"; // Hafta sonu yazı rengi
+  const haftaSonuGri = "#CBD5E1"; // Cumartesi & Pazar Gri Vurgusu
+  const beyaz = "#FFFFFF";        // Beyaz
+  const koyuYazi = "#0F172A";
+  const normalYazi = "#1E293B";
   
-  // 4. Tarih Aralığı: 01.10.2026 - 31.12.2029
-  const startDate = new Date(2026, 9, 1); // 1 Ekim 2026 (Month is 0-indexed: 9 = October)
-  const endDate = new Date(2029, 11, 31); // 31 Aralık 2029 (11 = December)
+  // 3. Tarih Aralığı: 01.10.2026 - 31.12.2029 (1188 Gün)
+  const startDate = new Date(2026, 9, 1);
+  const endDate = new Date(2029, 11, 31);
   
   const rows = [];
   const backgrounds = [];
@@ -80,22 +76,20 @@ function nobetListesiOlustur() {
     const gunStr = gunIsimleri[dayOfWeek];
     const isHaftaSonu = (dayOfWeek === 0 || dayOfWeek === 6);
     
-    // Veri
     rows.push([dateStr, gunStr, ""]);
     horizontalAlignments.push(["center", "center", "left"]);
     
-    // Renk ve Stil
     if (isHaftaSonu) {
-      // Cumartesi ve Pazar: BOLD ve GRİ
-      backgrounds.push([haftaSonuGri, haftaSonuGri, haftaSonuGri]);
+      // Cumartesi & Pazar: Tarih ve Gün GRİ + BOLD, Nöbetçi Hekim BEYAZ
+      backgrounds.push([haftaSonuGri, haftaSonuGri, beyaz]);
       fontWeights.push(["bold", "bold", "normal"]);
-      fontColors.push([haftaSonuKoyuGri, haftaSonuKoyuGri, "#0F172A"]);
+      fontColors.push([koyuYazi, koyuYazi, koyuYazi]);
     } else {
-      // Hafta İçi: Ay renk kodu
+      // Hafta İçi: SADECE Tarih renkli (ay rengi), Gün ve Nöbetçi Hekim BEYAZ
       const monthColor = ayRenkleri[cur.getMonth()];
-      backgrounds.push([monthColor, monthColor, monthColor]);
+      backgrounds.push([monthColor, beyaz, beyaz]);
       fontWeights.push(["normal", "normal", "normal"]);
-      fontColors.push(["#1E293B", "#1E293B", "#1E293B"]);
+      fontColors.push([normalYazi, normalYazi, normalYazi]);
     }
     
     cur.setDate(cur.getDate() + 1);
@@ -104,7 +98,6 @@ function nobetListesiOlustur() {
   const numRows = rows.length;
   const dataRange = sheet.getRange(2, 1, numRows, 3);
   
-  // Toplu atamalar (Maksimum Hız)
   dataRange.setValues(rows);
   dataRange.setBackgrounds(backgrounds);
   dataRange.setFontWeights(fontWeights);
@@ -114,11 +107,50 @@ function nobetListesiOlustur() {
   dataRange.setFontSize(10);
   dataRange.setBorder(true, true, true, true, true, true, "#E2E8F0", SpreadsheetApp.BorderStyle.SOLID);
   
-  // Sütun genişlikleri & Satır sabitleme
-  sheet.setColumnWidth(1, 130); // Tarih
-  sheet.setColumnWidth(2, 140); // Gün
-  sheet.setColumnWidth(3, 260); // Nöbetçi Hekim
+  sheet.setColumnWidth(1, 130);
+  sheet.setColumnWidth(2, 140);
+  sheet.setColumnWidth(3, 260);
   sheet.setFrozenRows(1);
   
-  SpreadsheetApp.getUi().alert("Başarılı!", `${numRows} günlük nöbet listesi (01.10.2026 - 31.12.2029) başarıyla oluşturuldu. Hafta sonları gri ve kalın, aylar renk koduyla ayrıldı.`, SpreadsheetApp.getUi().ButtonSet.OK);
+  try {
+    SpreadsheetApp.getUi().alert("Başarılı!", `${numRows} günlük nöbet listesi (01.10.2026 - 31.12.2029) başarıyla oluşturuldu!\n\n- Sadece Tarih sütunu renkli\n- Cumartesi ve Pazar gri & kalın\n- Nöbetçi Hekim sütunu beyaz`, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {}
+  
+  return { status: "success", rows: numRows };
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === "olustur") {
+    const res = nobetListesiOlustur();
+    return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ status: "active", message: "Antigravity Köprüsü Hazır!" })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    if (data.action === "olustur") {
+      const res = nobetListesiOlustur();
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (data.action === "nobet_guncelle") {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName("Nöbet Listesi (2026-2029)") || ss.getSheetByName("Nöbet Listesi") || ss.getSheets()[0];
+      const values = sheet.getRange("A2:A" + sheet.getLastRow()).getValues();
+      let updated = false;
+      for (let i = 0; i < values.length; i++) {
+        const rowDate = Utilities.formatDate(new Date(values[i][0]), Session.getScriptTimeZone(), "dd.MM.yyyy");
+        if (rowDate === data.tarih || values[i][0].toString().trim() === data.tarih) {
+          sheet.getRange(i + 2, 3).setValue(data.hekim);
+          updated = true;
+          break;
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: updated ? "success" : "not_found" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: "unknown_action" })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
