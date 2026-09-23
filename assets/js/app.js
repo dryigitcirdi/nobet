@@ -20,7 +20,7 @@ const INITIAL_DOCTORS = {
   "KK": { code: "KK", name: "Dr. Korkut Kasapbaşı", shortName: "Dr. Korkut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0532 497 58 60" },
   "HK": { code: "HK", name: "Dr. Hasan Kara", shortName: "Dr. Hasan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0544 532 35 55" },
   "ATB": { code: "ATB", name: "Dr. Alp Er Tunga Bölükbaşı", shortName: "Dr. Alp Er Tunga", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0530 496 80 77" },
-  "SR": { code: "SR", name: "Dr. Servin Rafi", shortName: "Dr. Servin", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
+  "SR": { code: "SR", name: "Dr. Servin Rafi", shortName: "Dr. Servin", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0538 274 41 11" },
   "UA": { code: "UA", name: "Dr. Umut Akgün", shortName: "Dr. Umut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "KÖ": { code: "KÖ", name: "Dr. Korhan Özkan", shortName: "Dr. Korhan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
   "BA": { code: "BA", name: "Dr. Burak Akan", shortName: "Dr. Burak", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
@@ -28,8 +28,8 @@ const INITIAL_DOCTORS = {
   "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
 };
 
-const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v4';
-const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v4';
+const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v5';
+const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v5';
 const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url_v2';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
 
@@ -299,15 +299,15 @@ class WeeklyDriveService {
 
         const dateStr = getCell(0);
         const nobetciRaw = getCell(2);
-        const phoneRaw = getCell(4);
         if (dateStr && nobetciRaw) {
           const parsed = this.parseDmy(dateStr);
           if (parsed) {
+            const doc = this.directory.getDoctor(nobetciRaw);
             dailyMap[parsed.iso] = {
               dateStr,
               iso: parsed.iso,
               nobetciRaw,
-              phone: phoneRaw
+              phone: (doc && doc.phone) ? doc.phone : ''
             };
           }
         }
@@ -814,7 +814,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=2.9').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.0').then(reg => {
         reg.update();
       }).catch(() => {});
     }
