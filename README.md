@@ -38,10 +38,7 @@ Tablonun **1. satırına** aşağıdaki sütun başlıklarını yazın:
 3. **Bağlantıyı Kopyala** butonuna basın.
 
 ### Adım 4: Uygulamaya Bağlama
-1. ATAdeck uygulamasında alttaki **"Drive"** (Ayarlar) sekmesine geçin.
-2. Kopyaladığınız bağlantıyı **"Google E-Tablo Bağlantısı"** kutusuna yapıştırın.
-3. **"Bağla ve Senkronize Et"** butonuna dokunun.
-4. Tüm ekip artık tablonuzu canlı olarak telefonlarından takip edebilir!
+Tablo adresi uygulamanın içinde sabittir (`assets/js/app.js` içindeki `DEFAULT_SHEET_URL`). Farklı bir tablo kullanmak için bu adresi değiştirip yeniden yayınlayın; uygulamada ayrıca bir bağlantı ayarı yoktur.
 
 ---
 

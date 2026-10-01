@@ -28,9 +28,11 @@ const INITIAL_DOCTORS = {
   "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
 };
 
-const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v5';
+// E-Tablodaki icap kısaltması rehberdeki kodundan farklıysa burada eşlenir.
+// AB = Alper Bölükbaşı → rehberde Dr. Alp Er Tunga Bölükbaşı (ATB)
+const DOCTOR_CODE_ALIASES = { "AB": "ATB" };
+
 const STORAGE_KEY_MANUAL_NOBETCI = 'vigil_manual_nobetci_v6';
-const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url_v2';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
 const DAILY_SHEET_GID = '1558096373';
 const SHIFT_START_HOUR = 8; // nöbet her gün 08:00'de devredilir
@@ -45,40 +47,7 @@ function getDutyDateStr(now = new Date()) {
 
 class DoctorDirectory {
   constructor() {
-    this.doctors = this.load();
-  }
-
-  load() {
-    let docs = JSON.parse(JSON.stringify(INITIAL_DOCTORS));
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_DOCTORS) || localStorage.getItem('vigil_doctors_directory_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        for (const k in parsed) {
-          const item = parsed[k];
-          if (docs[k]) {
-            if (item.phone) docs[k].phone = item.phone;
-            if (item.name && 
-                !item.name.endsWith(k) && 
-                item.name.length > 6 && 
-                !item.name.startsWith('Dr. ' + k)) {
-              docs[k].name = item.name;
-            }
-          } else {
-            docs[k] = item;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Directory load error:', e);
-    }
-    return docs;
-  }
-
-  save() {
-    try {
-      localStorage.setItem(STORAGE_KEY_DOCTORS, JSON.stringify(this.doctors));
-    } catch (e) {}
+    this.doctors = JSON.parse(JSON.stringify(INITIAL_DOCTORS));
   }
 
   getDoctor(code) {
@@ -86,6 +55,9 @@ class DoctorDirectory {
     const raw = String(code).trim();
     const upper = raw.toUpperCase();
     const trUpper = raw.toLocaleUpperCase('tr-TR');
+
+    const aliased = DOCTOR_CODE_ALIASES[upper] || DOCTOR_CODE_ALIASES[trUpper];
+    if (aliased && this.doctors[aliased]) return this.doctors[aliased];
 
     if (this.doctors[upper]) return this.doctors[upper];
     if (this.doctors[trUpper]) return this.doctors[trUpper];
@@ -105,30 +77,9 @@ class DoctorDirectory {
     return { code: raw, name: `Dr. ${raw}`, shortName: `Dr. ${raw}`, role: 'Uzman Hekim', phone: '' };
   }
 
-  updateDoctor(code, name, phone) {
-    const raw = String(code).trim();
-    const trUpper = raw.toLocaleUpperCase('tr-TR');
-    if (!this.doctors[trUpper]) {
-      this.doctors[trUpper] = { 
-        code: trUpper, 
-        name: name || `Dr. ${trUpper}`, 
-        shortName: name || `Dr. ${trUpper}`, 
-        role: 'Uzman Hekim', 
-        phone: phone || '' 
-      };
-    } else {
-      if (name) {
-        this.doctors[trUpper].name = name;
-        this.doctors[trUpper].shortName = name.replace('Dr. ', '');
-      }
-      this.doctors[trUpper].phone = phone || '';
-    }
-    this.save();
-  }
-
   getAll() {
     const unique = new Map();
-    const priorityCodes = ["YC", "UA", "KÖ", "BA", "KS", "SG", "EK", "DG", "AB"];
+    const priorityCodes = ["YC", "UA", "KÖ", "BA", "KS", "SG", "EK", "DG", "ATB"];
     
     priorityCodes.forEach(code => {
       const d = this.doctors[code];
@@ -154,16 +105,7 @@ class DoctorDirectory {
 class WeeklyDriveService {
   constructor(directory) {
     this.directory = directory;
-    this.sheetUrl = localStorage.getItem(STORAGE_KEY_SHEET_URL) || DEFAULT_SHEET_URL;
-  }
-
-  setSheetUrl(url) {
-    this.sheetUrl = (url || '').trim() || DEFAULT_SHEET_URL;
-    localStorage.setItem(STORAGE_KEY_SHEET_URL, this.sheetUrl);
-  }
-
-  getSheetUrl() {
-    return this.sheetUrl;
+    this.sheetUrl = DEFAULT_SHEET_URL;
   }
 
   parseDmy(str) {
@@ -521,8 +463,6 @@ class VigilApp {
     this.initElements();
     this.initTabs();
     this.initCalendar();
-    this.initDirectoryView();
-    this.initSettings();
     this.initPwa();
     this.initAutoRefresh();
     this.loadData();
@@ -622,9 +562,6 @@ class VigilApp {
     this.btnCloseSheet = document.getElementById('btn-close-sheet');
 
     // Directory
-    this.doctorDirectoryList = document.getElementById('doctor-directory-list');
-    this.searchInput = document.getElementById('search-input');
-    this.doctorCountBadge = document.getElementById('doctor-count-badge');
 
     // Attach 3D tilt
     if (this.cardNobetci) this.tiltEngine.attach(this.cardNobetci, { maxRotation: 8 });
@@ -785,39 +722,9 @@ class VigilApp {
     if (window.lucide) lucide.createIcons();
   }
 
-  initDirectoryView() {
-    this.renderDirectory();
-    if (this.searchInput) {
-      this.searchInput.addEventListener('input', () => this.renderDirectory());
-    }
-  }
-
-  initSettings() {
-    const input = document.getElementById('input-sheet-url');
-    const saveBtn = document.getElementById('btn-save-sheet');
-    const resetBtn = document.getElementById('btn-reset-demo');
-
-    if (input) input.value = this.driveService.getSheetUrl();
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => {
-        this.triggerHaptic();
-        this.driveService.setSheetUrl(input.value);
-        this.loadData(true);
-      });
-    }
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        this.triggerHaptic();
-        input.value = DEFAULT_SHEET_URL;
-        this.driveService.setSheetUrl(DEFAULT_SHEET_URL);
-        this.loadData(true);
-      });
-    }
-  }
-
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.1').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.3').then(reg => {
         reg.update();
       }).catch(() => {});
     }
@@ -854,16 +761,7 @@ class VigilApp {
 
     const synced = weeklyResult.success !== false && dailyRoster !== null;
     this.syncOk = synced;
-    const badge = document.getElementById('sync-status-badge');
-    const timeEl = document.getElementById('sync-status-time');
-    if (badge) {
-      badge.textContent = synced ? 'Google E-Tablo Bağlı' : 'Veri alınamadı';
-      badge.className = synced ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-red-400 font-semibold';
-    }
     if (this.syncIndicator) this.syncIndicator.textContent = synced ? 'DRIVE' : 'VERİ YOK';
-    if (timeEl) {
-      timeEl.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    }
     const notesEl = document.getElementById('today-notes-text');
     if (notesEl) {
       notesEl.textContent = synced
@@ -875,7 +773,6 @@ class VigilApp {
     this.renderIcapciCard();
     this.renderUpcomingWeeks();
     if (this.calendar) this.calendar.setWeeks(this.weeks);
-    this.renderDirectory();
 
     // Auto-select today in calendar details
     const todayWeek = this.getTodayWeek();
@@ -898,22 +795,24 @@ class VigilApp {
     return this.syncOk ? notEnteredText : 'Veri alınamadı';
   }
 
-  setContactLinks(els, phone, waMessage, onMissingPhone) {
+  // Telefon yoksa ana düğme pasifleşir ve nedenini yazar; WhatsApp satırı gizlenir.
+  setContactLinks(els, phone, waMessage, missingLabel) {
     const phoneClean = this.cleanPhone(phone);
     if (els.call) {
+      const label = els.call.querySelector('span');
+      if (label && !els.call.dataset.label) els.call.dataset.label = label.textContent;
+      if (label) label.textContent = phoneClean ? els.call.dataset.label : missingLabel;
       els.call.href = phoneClean ? `tel:${phoneClean}` : '#';
-      els.call.onclick = phoneClean ? null : (e) => {
-        e.preventDefault();
-        onMissingPhone();
-      };
+      els.call.onclick = phoneClean ? null : (e) => e.preventDefault();
       els.call.classList.toggle('opacity-60', !phoneClean);
+      els.call.classList.toggle('pointer-events-none', !phoneClean);
     }
     if (els.whatsapp) {
       // wa.me uluslararası biçim ister: 0535... → 90535...
       const waNumber = phoneClean.replace(/^\+/, '').replace(/^0/, '90');
       els.whatsapp.href = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}` : '#';
-      els.whatsapp.classList.toggle('opacity-60', !phoneClean);
-      els.whatsapp.classList.toggle('pointer-events-none', !phoneClean);
+      const row = els.whatsapp.parentElement;
+      if (row) row.style.display = phoneClean ? '' : 'none';
     }
   }
 
@@ -926,7 +825,7 @@ class VigilApp {
     if (this.nobetciPhoneDisplay) {
       this.nobetciPhoneDisplay.textContent = !doc
         ? (!this.hasLoaded ? '' : this.syncOk ? 'E-Tabloda bu gün için nöbetçi yok' : 'Google E-Tabloya ulaşılamadı')
-        : (doc.phone ? `Telefon: ${doc.phone}` : 'Telefon rehberden eklenebilir');
+        : (doc.phone ? `Telefon: ${doc.phone}` : 'Telefon kayıtlı değil');
     }
 
     // Tablo kaynaklı nöbetçi tabloda değiştirilir; el ile seçim yalnızca kayıt yokken sunulur.
@@ -938,7 +837,7 @@ class VigilApp {
       { call: this.btnCallNobetci, whatsapp: this.btnWhatsappNobetci },
       doc ? doc.phone : '',
       'Hocam iyi nöbetler, servisten arıyorum.',
-      () => (doc && doc.fromSheet) ? this.switchTab('tab-search') : this.openNobetciModal()
+      doc ? 'TELEFON YOK' : 'NÖBETÇİ BELİRSİZ'
     );
   }
 
@@ -967,7 +866,7 @@ class VigilApp {
       { call: this.btnCallIcapci, whatsapp: this.btnWhatsappIcapci },
       liveDoc ? liveDoc.phone : '',
       'Hocam merhaba, icap göreviniz için klinikten arıyorum.',
-      () => this.switchTab('tab-search')
+      liveDoc ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ'
     );
   }
 
@@ -1023,86 +922,6 @@ class VigilApp {
     if (window.lucide) lucide.createIcons();
   }
 
-  renderDirectory() {
-    if (!this.doctorDirectoryList) return;
-    const q = (this.searchInput ? this.searchInput.value : '').toLowerCase().trim();
-    const all = this.directory.getAll();
-
-    if (this.doctorCountBadge) {
-      this.doctorCountBadge.textContent = `${all.length} Hekim`;
-    }
-
-    const filtered = all.filter(d => 
-      !q || d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q) || (d.phone && d.phone.includes(q))
-    );
-
-    this.doctorDirectoryList.innerHTML = filtered.map(d => {
-      const phoneClean = this.cleanPhone(d.phone);
-
-      return `
-        <div class="glass-panel p-4 space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-bold text-amber-400">
-                <i data-lucide="user" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h4 class="text-sm font-bold text-white">${d.name}</h4>
-                <p class="text-[11px] text-white/50">${d.role}</p>
-              </div>
-            </div>
-            ${phoneClean ? `
-              <div class="flex items-center gap-1.5">
-                <a href="tel:${phoneClean}" class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center active:scale-95 transition-all" title="${d.name} Ara">
-                  <i data-lucide="phone" class="w-4 h-4"></i>
-                </a>
-                <a href="https://wa.me/${phoneClean.replace(/^\+/, '')}" target="_blank" class="w-8 h-8 rounded-xl bg-white/10 text-white/70 border border-white/10 flex items-center justify-center active:scale-95 transition-all" title="WhatsApp Mesaj">
-                  <i data-lucide="message-circle" class="w-4 h-4"></i>
-                </a>
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Phone Number Input & Save -->
-          <div class="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
-            <input 
-              type="tel" 
-              data-doc-code="${d.code}"
-              value="${d.phone || ''}" 
-              placeholder="Telefon: 05xx xxx xx xx" 
-              class="doc-phone-input flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-white/30 focus:outline-none focus:border-amber-400"
-            />
-            <button data-save-doc="${d.code}" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs text-white/80 font-medium transition-all">
-              Kaydet
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Attach save events
-    this.doctorDirectoryList.querySelectorAll('[data-save-doc]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const code = btn.getAttribute('data-save-doc');
-        const input = this.doctorDirectoryList.querySelector(`.doc-phone-input[data-doc-code="${code}"]`);
-        if (input) {
-          this.directory.updateDoctor(code, null, input.value.trim());
-          btn.textContent = 'Kaydedildi ✓';
-          btn.classList.add('text-emerald-400');
-          setTimeout(() => {
-            btn.textContent = 'Kaydet';
-            btn.classList.remove('text-emerald-400');
-          }, 1500);
-          this.triggerHaptic();
-          this.renderNobetciCard();
-          this.renderIcapciCard();
-        }
-      });
-    });
-
-    if (window.lucide) lucide.createIcons();
-  }
-
   openNobetciModal() {
     if (!this.nobetModal) return;
     const docs = this.directory.getAll();
@@ -1151,7 +970,7 @@ class VigilApp {
                 <span>NÖBETÇİYİ ARA (${dailyDoc.shortName || dailyDoc.name})</span>
               </a>
             ` : `
-              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon rehberden aranabilir.</div>
+              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>
             `}
           </div>
         </div>
@@ -1178,7 +997,7 @@ class VigilApp {
                 <span>İCAPÇIYI ARA (${liveDoc.shortName || liveDoc.name})</span>
               </a>
             ` : `
-              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon numarası rehberden eklenebilir.</div>
+              <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>
             `}
           </div>
         </div>

@@ -45,7 +45,7 @@
   <meta http-equiv="Expires" content="0">
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="assets/css/style.css?v=3.1">
+  <link rel="stylesheet" href="assets/css/style.css?v=3.3">
 </head>
 <body class="safe-top-padding safe-bottom-padding select-none">
 
@@ -241,107 +241,6 @@
       </div>
     </div>
 
-    <!-- ====================================================================
-         TAB 3: KLİNİK HEKİM REHBERİ (DOCTOR DIRECTORY & PHONES)
-         ==================================================================== -->
-    <div id="tab-search" class="tab-pane space-y-4">
-      <!-- Info Header -->
-      <div class="glass-panel p-4 flex items-center justify-between">
-        <div>
-          <h3 class="text-sm font-bold text-white">Klinik Hekim Rehberi</h3>
-          <p class="text-xs text-white/50">Tek dokunuşla arama ve telefon güncelleme</p>
-        </div>
-        <span class="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-mono font-semibold" id="doctor-count-badge">9 Hekim</span>
-      </div>
-
-      <!-- Search Input -->
-      <div class="relative">
-        <i data-lucide="search" class="w-4 h-4 text-white/40 absolute left-4 top-1/2 -translate-y-1/2"></i>
-        <input 
-          id="search-input" 
-          type="search" 
-          placeholder="Hekim adı ara (Dr. Yiğit, Dr. Umut, Dr. Korhan...)" 
-          class="w-full bg-white/[0.05] border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/40 focus:outline-none focus:border-amber-400/60 focus:bg-white/[0.08] transition-all"
-        />
-      </div>
-      <!-- Doctor Directory List -->
-      <div id="doctor-directory-list" class="space-y-2.5">
-        <!-- Dynamically rendered doctor cards with editable phone inputs -->
-      </div>
-    </div>
-
-    <!-- ====================================================================
-         TAB 4: GOOGLE DRIVE VERİ BAĞLANTISI (SETTINGS)
-         ==================================================================== -->
-    <div id="tab-settings" class="tab-pane space-y-4">
-
-      <!-- Google Sheets Connection Card -->
-      <div class="glass-panel p-5 space-y-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-            <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-white">Google Drive / E-Tablo</h3>
-            <p class="text-xs text-white/50">Haftalık İcap Listesi Bağlantısı</p>
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <label for="input-sheet-url" class="block text-xs font-mono text-white/60">Google E-Tablo Bağlantısı veya ID:</label>
-          <input 
-            id="input-sheet-url" 
-            type="text" 
-            value="https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520"
-            placeholder="https://docs.google.com/spreadsheets/d/..."
-            class="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-white/30 focus:outline-none focus:border-amber-400"
-          />
-          <p class="text-[11px] text-white/40">
-            Klinik icap tablonuz doğrudan bağlıdır. Yeni bir link girildiğinde anında eşitlenir.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2 pt-1">
-          <button id="btn-save-sheet" class="action-btn action-btn-primary flex-1 py-2 text-xs">
-            <i data-lucide="save" class="w-3.5 h-3.5"></i>
-            <span>Bağla ve Senkronize Et</span>
-          </button>
-          <button id="btn-reset-demo" class="action-btn action-btn-secondary py-2 text-xs" title="Varsayılan Tabloyu Yükle">
-            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-            <span>Sıfırla</span>
-          </button>
-        </div>
-
-        <div id="sync-status-box" class="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs space-y-1">
-          <div class="flex items-center justify-between text-white/50">
-            <span>Bağlantı Durumu:</span>
-            <span id="sync-status-badge" class="font-mono text-emerald-400 font-semibold">Google E-Tablo Bağlı</span>
-          </div>
-          <div class="flex items-center justify-between text-white/50">
-            <span>Son Güncelleme:</span>
-            <span id="sync-status-time" class="font-mono text-white/70">Şimdi</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Table Rules Explanation -->
-      <div class="glass-panel p-5 space-y-3">
-        <h4 class="text-xs uppercase font-mono tracking-wider text-amber-400/90 font-semibold">İcap Kural Mantığı</h4>
-        <ul class="text-xs text-white/70 space-y-1.5 list-disc list-inside leading-relaxed">
-          <li><b>Tarih Aralığı:</b> Pazartesi-Pazar haftalık 7 günlük bloklar halinde okunur.</li>
-          <li><b>Asıl İcapçı:</b> D sütunundaki planlanan hekimdir (Dr. Umut Akgün, Dr. Yiğit Umur Cırdı, Dr. Korhan Özkan vb.).</li>
-          <li><b>Değişim Kuralı:</b> E sütununda bir hekim kodu/ismi varsa otomatik olarak o hekim aktif icapçı yapılır. E-tabloda kısaltmalar yer alsa dahi uygulamada hekimlerin tam adları görüntülenir.</li>
-        </ul>
-      </div>
-
-      <!-- About & Version -->
-      <div class="text-center py-2 space-y-1 text-white/30 text-xs font-mono">
-        <div>ATAdeck — Nöbet & İcap Takip</div>
-        <div class="text-[10px]">Designed for Dr. Yiğit Cırdı & Klinik Ekibi</div>
-      </div>
-
-    </div>
-
   </main>
 
   <!-- ====================================================================
@@ -405,7 +304,7 @@
        BOTTOM NAVIGATION DOCK (iOS NATIVE FEEL)
        ==================================================================== -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 px-4 pb-[calc(var(--safe-bottom)+0.5rem)] pt-2 bg-gradient-to-t from-obsidian via-obsidian/95 to-transparent">
-    <div class="max-w-xs mx-auto glass-dock rounded-full px-3 py-2 flex items-center justify-around">
+    <div class="max-w-[220px] mx-auto glass-dock rounded-full px-3 py-2 flex items-center justify-around">
       
       <!-- Tab 1: Bugün -->
       <button data-tab="tab-today" class="nav-btn active flex flex-col items-center gap-1 text-amber-400 transition-all">
@@ -419,22 +318,10 @@
         <span class="text-[10px] font-medium tracking-tight">İcaplar</span>
       </button>
 
-      <!-- Tab 3: Rehber -->
-      <button data-tab="tab-search" class="nav-btn flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-all">
-        <i data-lucide="users" class="w-5 h-5"></i>
-        <span class="text-[10px] font-medium tracking-tight">Rehber</span>
-      </button>
-
-      <!-- Tab 4: Ayarlar / Drive -->
-      <button data-tab="tab-settings" class="nav-btn flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-all">
-        <i data-lucide="sliders" class="w-5 h-5"></i>
-        <span class="text-[10px] font-medium tracking-tight">Drive</span>
-      </button>
-
     </div>
   </nav>
 
   <!-- Application Logic -->
-  <script src="assets/js/app.js?v=3.1"></script>
+  <script src="assets/js/app.js?v=3.3"></script>
 </body>
 </html>
