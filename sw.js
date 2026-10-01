@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vigil-cache-v3.4';
+const CACHE_NAME = 'vigil-cache-v3.5';
 const STATIC_ASSETS = [
   './',
   './index.html',

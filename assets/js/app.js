@@ -32,6 +32,11 @@ const INITIAL_DOCTORS = {
 // AB = Alper Bölükbaşı → rehberde Dr. Alp Er Tunga Bölükbaşı (ATB)
 const DOCTOR_CODE_ALIASES = { "AB": "ATB" };
 
+// İcapçı hocaların sorumlu uzmanı: icapta işi yürüten ve ilk aranacak kişi.
+// YC hem icap tutar hem UA'nın uzmanıdır (kendi haftasında tek kişidir);
+// KS haftalarında uzman tablodaki G sütunundan gelir.
+const RESPONSIBLE_SPECIALISTS = { "UA": "YC", "BA": "DG", "KÖ": "EK", "SG": "ATB" };
+
 const STORAGE_KEY_MANUAL_NOBETCI = 'vigil_manual_nobetci_v6';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
 const DAILY_SHEET_GID = '1558096373';
@@ -175,8 +180,8 @@ class WeeklyDriveService {
         const note = getCell(5);
         const extraChange = getCell(6);
 
-        // E (değişim) "doğru kişi bu sütun" kuralıyla geçerlidir: doluysa hem icapçı hem aranacak kişi odur.
-        // E boşsa icapçı D'dir. KS gibi icapları paylaşılan haftalarda aranacak kişi G'deki sorumlu uzmandır.
+        // E (değişim) "doğru kişi bu sütun" kuralıyla geçerlidir: doluysa icapçı hoca odur, değilse D.
+        // G: KS gibi icapları paylaşılan haftalarda yerine bakan sorumlu uzman (E doluysa geçersiz).
         const isDoctorValue = (val) => {
           if (!val) return false;
           const clean = val.trim();
@@ -189,9 +194,7 @@ class WeeklyDriveService {
         };
 
         const activeCode = isDoctorValue(changeCode) ? changeCode : scheduledCode;
-        const calleeCode = isDoctorValue(changeCode)
-          ? changeCode
-          : (isDoctorValue(extraChange) ? extraChange : scheduledCode);
+        const specialistCode = !isDoctorValue(changeCode) && isDoctorValue(extraChange) ? extraChange : '';
 
         roster.push({
           startDate: parsedStart.iso,
@@ -200,7 +203,7 @@ class WeeklyDriveService {
           endDateObj: parsedEnd.dateObj,
           rangeText: `${startStr} – ${endStr}`,
           activeCode,
-          calleeCode,
+          specialistCode,
           notes: note || ''
         });
       });
@@ -535,9 +538,10 @@ class VigilApp {
     this.icapciRoleText = document.getElementById('today-icapci-role-text');
     this.icapRangeBadge = document.getElementById('icap-range-badge');
     this.icapWeekText = document.getElementById('icap-week-text');
-    this.icapCalleeNote = document.getElementById('icap-callee-note');
-    this.icapCalleeName = document.getElementById('icap-callee-name');
-    this.icapCalleeReason = document.getElementById('icap-callee-reason');
+    this.icapHocaRow = document.getElementById('icap-hoca-row');
+    this.icapHocaName = document.getElementById('icap-hoca-name');
+    this.btnCallHoca = document.getElementById('btn-call-hoca');
+    this.btnWhatsappHoca = document.getElementById('btn-whatsapp-hoca');
     this.btnCallIcapci = document.getElementById('btn-call-icapci');
     this.btnWhatsappIcapci = document.getElementById('btn-whatsapp-icapci');
 
@@ -692,24 +696,20 @@ class VigilApp {
 
     let icapHtml = '';
     if (week) {
-      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(week);
-      const phoneClean = this.cleanPhone(callee.phone);
+      const people = this.getIcapPeople(week);
+      const { hoca, uzman, hasSpecialist } = people;
       icapHtml = `
         <div class="flex items-center justify-between">
-          <div>
+          <div class="min-w-0">
             <div class="flex items-center gap-1.5 mb-0.5">
               <span class="w-2 h-2 rounded-full bg-sky-400"></span>
               <p class="text-xs text-sky-300/80 font-semibold uppercase tracking-wider">İcap Sorumlu Hekimi</p>
             </div>
-            <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
+            <h4 class="text-base font-bold text-white">${hoca.name}</h4>
             <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText}</p>
-            ${delegated ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Aranacak kişi: ${callee.name}</p>` : ''}
+            ${hasSpecialist ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Sorumlu uzman: ${uzman.name}</p>` : ''}
           </div>
-          ${phoneClean ? `
-            <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${callee.name} Ara">
-              <i data-lucide="phone-call" class="w-5 h-5"></i>
-            </a>
-          ` : ''}
+          ${this.renderCallCluster(people)}
         </div>
       `;
     } else if (!dailyHtml) {
@@ -722,7 +722,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.4').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.5').then(reg => {
         reg.update();
       }).catch(() => {});
     }
@@ -794,7 +794,7 @@ class VigilApp {
   }
 
   // Telefon yoksa ana düğme pasifleşir ve nedenini yazar; WhatsApp satırı gizlenir.
-  setContactLinks(els, phone, waMessage, missingLabel, callLabel) {
+  setContactLinks(els, phone, missingLabel, callLabel) {
     const phoneClean = this.cleanPhone(phone);
     if (els.call) {
       const label = els.call.querySelector('span');
@@ -806,12 +806,59 @@ class VigilApp {
       els.call.classList.toggle('pointer-events-none', !phoneClean);
     }
     if (els.whatsapp) {
-      // wa.me uluslararası biçim ister: 0535... → 90535...
-      const waNumber = phoneClean.replace(/^\+/, '').replace(/^0/, '90');
-      els.whatsapp.href = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}` : '#';
+      els.whatsapp.href = phoneClean ? this.waLink(phoneClean) : '#';
       const row = els.whatsapp.parentElement;
       if (row) row.style.display = phoneClean ? '' : 'none';
     }
+  }
+
+  // wa.me uluslararası biçim ister: 0535... → 90535...; hazır mesaj eklenmez
+  waLink(phoneClean) {
+    return `https://wa.me/${phoneClean.replace(/^\+/, '').replace(/^0/, '90')}`;
+  }
+
+  // İkincil (küçük) arama + WhatsApp simgeleri
+  setLinkPair(callEl, waEl, phone) {
+    const phoneClean = this.cleanPhone(phone);
+    [callEl, waEl].forEach(el => {
+      if (!el) return;
+      el.classList.toggle('opacity-40', !phoneClean);
+      el.classList.toggle('pointer-events-none', !phoneClean);
+    });
+    if (callEl) callEl.href = phoneClean ? `tel:${phoneClean}` : '#';
+    if (waEl) waEl.href = phoneClean ? this.waLink(phoneClean) : '#';
+  }
+
+  // Sağdaki iki arama simgesi: dolu ve büyük olan sorumlu uzmanı arar (iş onun üzerinden yürür),
+  // ince ve küçük olan hocayı. Ayrı uzman yoksa tek simge icapçıyı arar.
+  renderCallCluster({ hoca, uzman, hasSpecialist }) {
+    const uzmanTel = this.cleanPhone(uzman.phone);
+    const hocaTel = this.cleanPhone(hoca.phone);
+    const primary = uzmanTel
+      ? `
+        <a href="tel:${uzmanTel}" class="flex flex-col items-center gap-0.5 active:scale-90 transition-all" title="${hasSpecialist ? 'Sorumlu uzmanı ara' : 'İcapçıyı ara'}: ${uzman.name}">
+          <span class="w-10 h-10 rounded-full bg-sky-500 text-neutral-950 flex items-center justify-center shadow-[0_0_14px_rgba(56,189,248,0.35)]">
+            <i data-lucide="phone-call" class="w-5 h-5"></i>
+          </span>
+          <span class="text-[9px] font-mono font-bold tracking-wider text-sky-300">${hasSpecialist ? 'UZMAN' : 'ARA'}</span>
+        </a>`
+      : `
+        <div class="flex flex-col items-center gap-0.5 opacity-40" title="Telefon kayıtlı değil">
+          <span class="w-10 h-10 rounded-full bg-white/10 text-white/60 flex items-center justify-center">
+            <i data-lucide="phone-off" class="w-5 h-5"></i>
+          </span>
+          <span class="text-[9px] font-mono tracking-wider text-white/50">YOK</span>
+        </div>`;
+    const secondary = hasSpecialist && hocaTel
+      ? `
+        <a href="tel:${hocaTel}" class="flex flex-col items-center gap-0.5 active:scale-90 transition-all" title="Hocayı ara: ${hoca.name}">
+          <span class="w-8 h-8 mt-1 rounded-full border border-white/15 bg-white/[0.04] text-white/60 flex items-center justify-center">
+            <i data-lucide="phone" class="w-4 h-4"></i>
+          </span>
+          <span class="text-[9px] font-mono tracking-wider text-white/40">HOCA</span>
+        </a>`
+      : '';
+    return `<div class="flex items-start gap-2.5 shrink-0 ml-2">${primary}${secondary}</div>`;
   }
 
   renderNobetciCard() {
@@ -834,7 +881,6 @@ class VigilApp {
     this.setContactLinks(
       { call: this.btnCallNobetci, whatsapp: this.btnWhatsappNobetci },
       doc ? doc.phone : '',
-      'Hocam iyi nöbetler, servisten arıyorum.',
       doc ? 'TELEFON YOK' : 'NÖBETÇİ BELİRSİZ'
     );
   }
@@ -845,21 +891,25 @@ class VigilApp {
     return this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
   }
 
-  // İcapçı olarak adı geçen kişi ile aranacak kişi. KS gibi icapları paylaşılan haftalarda
-  // ikisi farklıdır: kartta KS yazar, aranacak kişi G sütunundaki sorumlu uzmandır.
+  // İcapçı hoca ile sorumlu uzmanı. İş uzman üzerinden yürür: tablodaki G sütunu (KS haftaları)
+  // varsa o, yoksa hocanın sabit uzmanı; ikisi de yoksa hoca kendisidir (örn. YC).
   getIcapPeople(week) {
-    const shown = this.directory.getDoctor(week.activeCode);
-    const callee = this.directory.getDoctor(week.calleeCode || week.activeCode);
-    return { shown, callee, delegated: callee.code !== shown.code };
+    const hoca = this.directory.getDoctor(week.activeCode);
+    const fromSheet = week.specialistCode ? this.directory.getDoctor(week.specialistCode) : null;
+    const mapped = RESPONSIBLE_SPECIALISTS[hoca.code];
+    const uzman = fromSheet || (mapped ? this.directory.getDoctor(mapped) : hoca);
+    return { hoca, uzman, hasSpecialist: uzman.code !== hoca.code };
   }
 
   renderIcapciCard() {
     const week = this.getTodayWeek();
     const people = week ? this.getIcapPeople(week) : null;
-    const liveDoc = people ? people.shown : null;
+    const hoca = people ? people.hoca : null;
+    const uzman = people ? people.uzman : null;
+    const split = !!(people && people.hasSpecialist);
 
     if (this.icapciNameEl) {
-      this.icapciNameEl.textContent = liveDoc ? liveDoc.name : this.emptyLabel('İcapçı girilmemiş');
+      this.icapciNameEl.textContent = hoca ? hoca.name : this.emptyLabel('İcapçı girilmemiş');
     }
     if (this.icapRangeBadge) this.icapRangeBadge.textContent = week ? week.rangeText : 'Haftalık';
     if (this.icapWeekText) {
@@ -869,25 +919,21 @@ class VigilApp {
     }
     if (this.icapciRoleText) this.icapciRoleText.textContent = "İcap Sorumlu Hekimi";
 
-    // İcap paylaşılan haftada kartın altına "Aranacak kişi" notu düşer
-    const delegated = !!(people && people.delegated);
-    if (this.icapCalleeNote) {
-      this.icapCalleeNote.style.display = delegated ? '' : 'none';
-      if (delegated) {
-        const callee = people.callee;
-        this.icapCalleeName.textContent = callee.name;
-        this.icapCalleeReason.textContent =
-          `${liveDoc.shortName || liveDoc.name} icabında sorumlu uzman` + (callee.phone ? ` · ${callee.phone}` : '');
+    // Hocayı doğrudan arama: ikincil, küçük satır
+    if (this.icapHocaRow) {
+      this.icapHocaRow.style.display = split ? '' : 'none';
+      if (split) {
+        this.icapHocaName.textContent = hoca.name;
+        this.setLinkPair(this.btnCallHoca, this.btnWhatsappHoca, hoca.phone);
       }
     }
 
-    const callee = people ? people.callee : null;
+    // Ana düğmeler sorumlu uzmanı arar
     this.setContactLinks(
       { call: this.btnCallIcapci, whatsapp: this.btnWhatsappIcapci },
-      callee ? callee.phone : '',
-      'Hocam merhaba, icap göreviniz için klinikten arıyorum.',
-      callee ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ',
-      delegated ? 'SORUMLU UZMANI ARA' : null
+      uzman ? uzman.phone : '',
+      uzman ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ',
+      split ? `SORUMLU UZMANI ARA (${uzman.shortName || uzman.name})` : null
     );
   }
 
@@ -904,13 +950,13 @@ class VigilApp {
 
     this.upcomingList.innerHTML = upcoming.map((w, idx) => {
       const isCurrent = todayStr >= w.startDate && todayStr <= w.endDate;
-      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(w);
-      const phoneClean = this.cleanPhone(callee.phone);
+      const people = this.getIcapPeople(w);
+      const { hoca, uzman, hasSpecialist } = people;
 
       return `
         <div data-week-idx="${idx}" class="glass-panel p-3.5 hover:bg-white/[0.06] active:scale-[0.98] cursor-pointer transition-all">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 min-w-0">
               <div class="w-11 h-11 rounded-2xl ${
                 isCurrent 
                   ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400' 
@@ -918,24 +964,16 @@ class VigilApp {
               } flex items-center justify-center shrink-0">
                 <i data-lucide="${isCurrent ? 'radio' : 'user-check'}" class="w-5 h-5"></i>
               </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold text-white tracking-tight">${liveDoc.name}</span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span class="text-sm font-bold text-white tracking-tight">${hoca.name}</span>
                   ${isCurrent ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 font-mono font-bold">BU HAFTA</span>' : ''}
                 </div>
                 <p class="text-xs text-white/50 font-mono mt-0.5">${w.rangeText}</p>
-                ${delegated ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Aranacak: ${callee.name}</p>` : ''}
+                ${hasSpecialist ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Uzman: ${uzman.name}</p>` : ''}
               </div>
             </div>
-            ${phoneClean ? `
-              <a href="tel:${phoneClean}" class="w-9 h-9 rounded-full bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${callee.name} Ara">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-              </a>
-            ` : `
-              <div class="text-white/20 pr-1 shrink-0 ml-2">
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-              </div>
-            `}
+            ${this.renderCallCluster(people)}
           </div>
         </div>
       `;
@@ -1000,8 +1038,9 @@ class VigilApp {
     }
 
     if (week) {
-      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(week);
-      const phoneClean = this.cleanPhone(callee.phone);
+      const { hoca, uzman, hasSpecialist } = this.getIcapPeople(week);
+      const uzmanTel = this.cleanPhone(uzman.phone);
+      const hocaTel = this.cleanPhone(hoca.phone);
       contentHtml += `
         <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
           <div class="flex items-center justify-between">
@@ -1009,25 +1048,24 @@ class VigilApp {
             <span class="text-[11px] font-mono text-white/40">${week.rangeText}</span>
           </div>
           <div>
-            <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
+            <h4 class="text-xl font-bold text-white">${hoca.name}</h4>
             <p class="text-xs text-sky-300/80">İcap Sorumlu Hekimi</p>
           </div>
-          ${delegated ? `
-            <div class="rounded-xl bg-white/[0.06] px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider font-mono text-sky-300/80">Aranacak kişi</p>
-              <p class="text-sm font-bold text-white">${callee.name}</p>
-              <p class="text-[11px] text-white/55">${liveDoc.shortName || liveDoc.name} icabında sorumlu uzman</p>
-            </div>
-          ` : ''}
-          <div class="pt-2">
-            ${phoneClean ? `
-              <a href="tel:${phoneClean}" class="call-btn-large call-btn-icap py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-sky-500 hover:bg-sky-400 text-neutral-950 font-bold transition-all">
+          <div class="pt-2 space-y-2">
+            ${uzmanTel ? `
+              <a href="tel:${uzmanTel}" class="call-btn-large call-btn-icap py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-sky-500 hover:bg-sky-400 text-neutral-950 font-bold transition-all">
                 <i data-lucide="phone-call" class="w-4 h-4"></i>
-                <span>${delegated ? 'SORUMLU UZMANI ARA' : 'İCAPÇIYI ARA'} (${callee.shortName || callee.name})</span>
+                <span>${hasSpecialist ? 'SORUMLU UZMANI ARA' : 'İCAPÇIYI ARA'} (${uzman.shortName || uzman.name})</span>
               </a>
             ` : `
               <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>
             `}
+            ${hasSpecialist && hocaTel ? `
+              <a href="tel:${hocaTel}" class="flex items-center justify-center gap-2 w-full rounded-xl border border-white/15 bg-white/[0.04] py-2 text-xs font-semibold text-white/70 active:scale-95 transition-all">
+                <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+                <span>Hocayı ara (${hoca.shortName || hoca.name})</span>
+              </a>
+            ` : ''}
           </div>
         </div>
       `;
