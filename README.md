@@ -1,4 +1,4 @@
-# VIGIL — Ultra-Premium iOS Nöbet & İcap Takip Sistemi (PWA)
+# ATAdeck — Nöbet & İcap Takip Panosu (PWA)
 
 Apple, Linear, Arc Browser ve Porsche tasarım felsefesiyle inşa edilmiş; iPhone Safari üzerinden açılıp **"Ana Ekrana Ekle"** dendiğinde yerel bir iOS uygulaması gibi çalışan, canlı nöbetçi ve icapçı hekim takip sistemi.
 
@@ -11,7 +11,7 @@ Apple, Linear, Arc Browser ve Porsche tasarım felsefesiyle inşa edilmiş; iPho
 3. Safari'nin altındaki **Paylaş** simgesine (`⎋`) dokunun.
 4. Menüyü hafifçe aşağı kaydırıp **"Ana Ekrana Ekle"** (Add to Home Screen) seçeneğine dokunun.
 5. Sağ üstteki **"Ekle"** butonuna basın.
-6. Artık iPhone ana ekranınızda özel tasarlanmış titanyum logolu **VIGIL** simgesi belirecek ve Safari adres çubuğu olmadan tam ekran bir uygulama olarak açılacaktır!
+6. Artık iPhone ana ekranınızda özel tasarlanmış titanyum logolu **ATAdeck** simgesi belirecek ve Safari adres çubuğu olmadan tam ekran bir uygulama olarak açılacaktır!
 
 ---
 
@@ -38,7 +38,7 @@ Tablonun **1. satırına** aşağıdaki sütun başlıklarını yazın:
 3. **Bağlantıyı Kopyala** butonuna basın.
 
 ### Adım 4: Uygulamaya Bağlama
-1. VIGIL uygulamasında alttaki **"Drive"** (Ayarlar) sekmesine geçin.
+1. ATAdeck uygulamasında alttaki **"Drive"** (Ayarlar) sekmesine geçin.
 2. Kopyaladığınız bağlantıyı **"Google E-Tablo Bağlantısı"** kutusuna yapıştırın.
 3. **"Bağla ve Senkronize Et"** butonuna dokunun.
 4. Tüm ekip artık tablonuzu canlı olarak telefonlarından takip edebilir!
@@ -59,5 +59,5 @@ Uygulama sıfır sunucu kurulumu gerektirir. Şu platformlardan herhangi birine 
 
 - **3D Tilt & Specular Physics**: Kartlarda jiroskop ve dokunma hareketine göre hareket eden 60 FPS holografik yansıma.
 - **Offline / Çevrimdışı Çalışma**: Service Worker ve LocalStorage önbellekleme sayesinde ameliyathanede veya sığınakta bile nöbet listesi 0 milisaniyede açılır.
-- **Tek Dokunuşla Arama & SMS**: Nöbetçi veya icapçı hekime tek tuşla anında çağrı başlatma.
+- **Tek Dokunuşla Arama & WhatsApp**: Nöbetçi veya icapçı hekime tek tuşla arama başlatma veya WhatsApp mesajı.
 - **Apple Minimal Takvim**: Aylık nöbet matrisi ve renk kodlu görev göstergeleri.

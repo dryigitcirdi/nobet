@@ -1,4 +1,4 @@
-name: Deploy VIGIL to GitHub Pages
+name: Deploy ATAdeck to GitHub Pages
 
 on:
   push:

@@ -1,7 +1,7 @@
 {
-  "name": "VIGIL — Nöbet & İcap Takip",
-  "short_name": "VIGIL",
-  "description": "Premium, minimal ve akıllı iOS nöbetçi & icapçı takip sistemi.",
+  "name": "ATAdeck — Nöbet & İcap Takip",
+  "short_name": "ATAdeck",
+  "description": "Nöbetçi ve icapçı hekimi tek bakışta gösteren, iPhone ana ekranında çalışan takip panosu.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

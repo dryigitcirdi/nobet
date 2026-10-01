@@ -29,9 +29,19 @@ const INITIAL_DOCTORS = {
 };
 
 const STORAGE_KEY_DOCTORS = 'vigil_doctors_directory_v5';
-const STORAGE_KEY_NOBETCI = 'vigil_active_nobetci_v5';
+const STORAGE_KEY_MANUAL_NOBETCI = 'vigil_manual_nobetci_v6';
 const STORAGE_KEY_SHEET_URL = 'vigil_sheet_url_v2';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1EWUnbx8EuX2mIKsUhIEJFkej1l9YRAZgj01Zd26aSk0/edit?gid=2016035520#gid=2016035520';
+const DAILY_SHEET_GID = '1558096373';
+const SHIFT_START_HOUR = 8; // nöbet her gün 08:00'de devredilir
+
+// "Bugün" takvim günü değil nöbet günüdür: saat 08:00'den önce bir önceki günün
+// nöbetçisi ve icap haftası hâlâ görevdedir.
+function getDutyDateStr(now = new Date()) {
+  const d = new Date(now);
+  if (d.getHours() < SHIFT_START_HOUR) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 class DoctorDirectory {
   constructor() {
@@ -191,7 +201,8 @@ class WeeklyDriveService {
 
   async fetchWeeklyRoster() {
     const { sheetId, gid } = this.extractSheetIdAndGid(this.sheetUrl);
-    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=${gid}`;
+    // headers=1: ilk satır başlık. Google'ın başlık tahminine bırakılırsa ilk veri satırı kaybolabilir.
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=${gid}&headers=1`;
 
     try {
       const response = await fetch(url);
@@ -266,10 +277,11 @@ class WeeklyDriveService {
       };
     } catch (err) {
       console.warn('Google Sheet fetch error:', err);
+      // Uydurma liste göstermek yerine boş döneriz; ekranda "veri alınamadı" görünür.
       return {
         success: false,
         error: err.message,
-        weeks: this.generateFallbackWeeks(),
+        weeks: [],
         lastSync: new Date()
       };
     }
@@ -277,7 +289,9 @@ class WeeklyDriveService {
 
   async fetchDailyNobetRoster() {
     const { sheetId } = this.extractSheetIdAndGid(this.sheetUrl);
-    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=1558096373`;
+    // headers=0: sayfada başlık satırı ile ilk gün (01.10.2026) birleştirilip kaybolmasın.
+    // Başlık satırı ("Tarih") tarih olarak çözümlenemediği için aşağıda zaten elenir.
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=${DAILY_SHEET_GID}&headers=0`;
 
     try {
       const response = await fetch(url);
@@ -318,34 +332,6 @@ class WeeklyDriveService {
       console.warn('Daily nobet roster fetch error:', e);
       return null;
     }
-  }
-
-  generateFallbackWeeks() {
-    const list = [];
-    const now = new Date();
-    const codes = ['YC', 'UA', 'KÖ', 'BA', 'KS', 'SG'];
-    for (let i = -4; i <= 20; i++) {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1 + (i * 7));
-      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-
-      const fmt = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth()+1).padStart(2, '0')}.${d.getFullYear()}`;
-      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-      const code = codes[Math.abs(i) % codes.length];
-      const doc = this.directory.getDoctor(code);
-
-      list.push({
-        startDate: iso(start),
-        endDate: iso(end),
-        startDateObj: start,
-        endDateObj: end,
-        rangeText: `${fmt(start)} – ${fmt(end)}`,
-        activeCode: code,
-        activeDoctor: doc,
-        notes: ''
-      });
-    }
-    return list;
   }
 }
 
@@ -444,8 +430,7 @@ class CalendarView {
     if (startDayOfWeek === -1) startDayOfWeek = 6;
 
     const daysInMonth = new Date(this.viewYear, this.viewMonth + 1, 0).getDate();
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = getDutyDateStr();
 
     let html = `
       <div class="calendar-header flex items-center justify-between mb-4">
@@ -526,7 +511,12 @@ class VigilApp {
     this.driveService = new WeeklyDriveService(this.directory);
     this.tiltEngine = new TiltEngine();
     this.weeks = [];
-    this.activeNobetci = this.loadActiveNobetci();
+    this.dailyNobetMap = {};
+    this.activeNobetci = null;
+    this.dutyDateStr = getDutyDateStr();
+    this.hasLoaded = false;
+    this.syncOk = true;
+    this.lastLoadAt = 0;
 
     this.initElements();
     this.initTabs();
@@ -534,43 +524,58 @@ class VigilApp {
     this.initDirectoryView();
     this.initSettings();
     this.initPwa();
-    this.initCountdown();
+    this.initAutoRefresh();
     this.loadData();
   }
 
-  loadActiveNobetci() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_NOBETCI) || localStorage.getItem('vigil_active_nobetci_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const doc = this.directory.getDoctor(parsed.code || 'YC');
-        return {
-          code: doc.code,
-          name: doc.name,
-          role: "Nöbetçi Hekim",
-          phone: parsed.phone || doc.phone || ""
-        };
-      }
-    } catch (e) {}
-    
-    const def = this.directory.getDoctor('YC');
-    return {
-      code: def.code,
-      name: def.name,
-      role: "Nöbetçi Hekim",
-      phone: def.phone || ""
-    };
+  // Nöbetçi E-Tablodan gelir. El ile seçim yalnızca tabloda o nöbet günü için kayıt
+  // yokken devreye girer ve yalnızca seçildiği nöbet günü için geçerlidir.
+  resolveActiveNobetci() {
+    const item = this.dailyNobetMap[this.dutyDateStr];
+    if (item) {
+      const doc = this.directory.getDoctor(item.nobetciRaw);
+      return {
+        code: doc.code || 'NOBET',
+        name: doc.name || item.nobetciRaw,
+        role: "Nöbetçi Hekim",
+        phone: item.phone || doc.phone || "",
+        fromSheet: true
+      };
+    }
+    return this.loadManualNobetci();
   }
 
-  saveActiveNobetci(doc, customPhone) {
+  loadManualNobetci() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_MANUAL_NOBETCI) || 'null');
+      if (!saved || saved.date !== this.dutyDateStr) return null;
+      const doc = this.directory.getDoctor(saved.code);
+      return {
+        code: doc.code,
+        name: doc.name,
+        role: "Nöbetçi Hekim",
+        phone: saved.phone || doc.phone || "",
+        fromSheet: false
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  saveManualNobetci(doc, customPhone) {
     this.activeNobetci = {
       code: doc.code,
       name: doc.name,
       role: "Nöbetçi Hekim",
-      phone: customPhone || doc.phone || ""
+      phone: customPhone || doc.phone || "",
+      fromSheet: false
     };
     try {
-      localStorage.setItem(STORAGE_KEY_NOBETCI, JSON.stringify(this.activeNobetci));
+      localStorage.setItem(STORAGE_KEY_MANUAL_NOBETCI, JSON.stringify({
+        date: this.dutyDateStr,
+        code: doc.code,
+        phone: customPhone || ''
+      }));
     } catch (e) {}
     this.renderNobetciCard();
   }
@@ -588,7 +593,6 @@ class VigilApp {
     this.nobetciPhoneDisplay = document.getElementById('today-nobetci-phone-display');
     this.btnCallNobetci = document.getElementById('btn-call-nobetci');
     this.btnWhatsappNobetci = document.getElementById('btn-whatsapp-nobetci');
-    this.btnSmsNobetci = document.getElementById('btn-sms-nobetci');
     this.btnQuickSelectNobet = document.getElementById('btn-quick-select-nobet');
 
     // İcapçı Card (ALTTA)
@@ -599,7 +603,6 @@ class VigilApp {
     this.icapWeekText = document.getElementById('icap-week-text');
     this.btnCallIcapci = document.getElementById('btn-call-icapci');
     this.btnWhatsappIcapci = document.getElementById('btn-whatsapp-icapci');
-    this.btnSmsIcapci = document.getElementById('btn-sms-icapci');
 
     this.upcomingList = document.getElementById('upcoming-list');
     this.btnShowCalendar = document.getElementById('btn-show-calendar');
@@ -662,7 +665,7 @@ class VigilApp {
         const code = this.selectNobetciDoc.value;
         const doc = this.directory.getDoctor(code);
         const customPhone = this.inputNobetciCustomPhone.value.trim();
-        this.saveActiveNobetci(doc, customPhone);
+        this.saveManualNobetci(doc, customPhone);
         this.closeNobetciModal();
         this.triggerHaptic();
       });
@@ -814,67 +817,58 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.0').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.1').then(reg => {
         reg.update();
       }).catch(() => {});
     }
   }
 
-  initCountdown() {
-    const timerEl = document.getElementById('countdown-timer');
-    if (!timerEl) return;
-
-    const update = () => {
-      const now = new Date();
-      const target = new Date(now);
-      if (now.getHours() >= 8) target.setDate(target.getDate() + 1);
-      target.setHours(8, 0, 0, 0);
-
-      const diff = target - now;
-      if (diff <= 0) { timerEl.textContent = "00:00:00"; return; }
-
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      timerEl.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // Uygulama arka planda açık kalırsa (iOS PWA) nöbet devri ve E-Tablodaki değişiklikler
+  // yeniden öne gelince ekrana yansısın.
+  initAutoRefresh() {
+    const check = () => {
+      if (document.hidden) return;
+      const dayChanged = getDutyDateStr() !== this.dutyDateStr;
+      const stale = Date.now() - this.lastLoadAt > 5 * 60 * 1000;
+      if (dayChanged || stale) this.loadData();
     };
-    update();
-    setInterval(update, 1000);
+    document.addEventListener('visibilitychange', check);
+    setInterval(check, 60 * 1000);
   }
 
   async loadData(forceRefresh = false) {
     if (this.refreshIcon) this.refreshIcon.classList.add('animate-spin');
+    this.lastLoadAt = Date.now();
 
     const [weeklyResult, dailyRoster] = await Promise.all([
       this.driveService.fetchWeeklyRoster(),
       this.driveService.fetchDailyNobetRoster()
     ]);
 
+    this.dutyDateStr = getDutyDateStr();
     this.weeks = weeklyResult.weeks || [];
     this.dailyNobetMap = dailyRoster || {};
+    this.activeNobetci = this.resolveActiveNobetci();
+    this.hasLoaded = true;
+    const todayStr = this.dutyDateStr;
 
-    // Auto-update activeNobetci from sheet if today has a daily duty assigned
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    if (this.dailyNobetMap && this.dailyNobetMap[todayStr]) {
-      const todayDaily = this.dailyNobetMap[todayStr];
-      const doc = this.directory.getDoctor(todayDaily.nobetciRaw);
-      this.activeNobetci = {
-        code: doc.code || 'NOBET',
-        name: doc.name || todayDaily.nobetciRaw,
-        role: "Nöbetçi Hekim",
-        phone: todayDaily.phone || doc.phone || ""
-      };
-    }
-
+    const synced = weeklyResult.success !== false && dailyRoster !== null;
+    this.syncOk = synced;
     const badge = document.getElementById('sync-status-badge');
     const timeEl = document.getElementById('sync-status-time');
     if (badge) {
-      badge.textContent = weeklyResult.source === 'cloud' ? 'Google E-Tablo Bağlı' : 'Yerel Önbellek';
-      badge.className = weeklyResult.source === 'cloud' ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-sky-400 font-semibold';
+      badge.textContent = synced ? 'Google E-Tablo Bağlı' : 'Veri alınamadı';
+      badge.className = synced ? 'font-mono text-emerald-400 font-semibold' : 'font-mono text-red-400 font-semibold';
     }
+    if (this.syncIndicator) this.syncIndicator.textContent = synced ? 'DRIVE' : 'VERİ YOK';
     if (timeEl) {
       timeEl.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+    const notesEl = document.getElementById('today-notes-text');
+    if (notesEl) {
+      notesEl.textContent = synced
+        ? 'İcap listesi Google E-Tablo üzerinden anlık senkronize edilmektedir.'
+        : 'Google E-Tabloya ulaşılamadı; güncel nöbet ve icap bilgisi gösterilemiyor. Bağlantınızı kontrol edip yenileyin.';
     }
 
     this.renderNobetciCard();
@@ -898,107 +892,88 @@ class VigilApp {
     return phone.replace(/[^0-9+]/g, '');
   }
 
-  renderNobetciCard() {
-    const doc = this.activeNobetci;
-    if (this.nobetciNameEl) this.nobetciNameEl.textContent = doc.name;
-    if (this.nobetciRoleText) this.nobetciRoleText.textContent = "Nöbetçi Hekim";
-    
-    const phoneClean = this.cleanPhone(doc.phone);
-    if (this.nobetciPhoneDisplay) {
-      this.nobetciPhoneDisplay.textContent = doc.phone ? `Telefon: ${doc.phone}` : 'Telefon rehberden eklenebilir';
-    }
+  // Kart başlığında kayıt yokken gösterilecek metin: yükleniyor / ulaşılamadı / girilmemiş.
+  emptyLabel(notEnteredText) {
+    if (!this.hasLoaded) return 'Yükleniyor...';
+    return this.syncOk ? notEnteredText : 'Veri alınamadı';
+  }
 
-    // Call button
-    if (this.btnCallNobetci) {
-      if (phoneClean) {
-        this.btnCallNobetci.href = `tel:${phoneClean}`;
-        this.btnCallNobetci.classList.remove('opacity-60');
-      } else {
-        this.btnCallNobetci.href = "#";
-        this.btnCallNobetci.onclick = (e) => {
-          e.preventDefault();
-          this.openNobetciModal();
-        };
-      }
+  setContactLinks(els, phone, waMessage, onMissingPhone) {
+    const phoneClean = this.cleanPhone(phone);
+    if (els.call) {
+      els.call.href = phoneClean ? `tel:${phoneClean}` : '#';
+      els.call.onclick = phoneClean ? null : (e) => {
+        e.preventDefault();
+        onMissingPhone();
+      };
+      els.call.classList.toggle('opacity-60', !phoneClean);
     }
-
-    // WhatsApp
-    if (this.btnWhatsappNobetci) {
-      const waNumber = phoneClean.replace(/^\+/, '');
-      this.btnWhatsappNobetci.href = phoneClean 
-        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam iyi nöbetler, servisten arıyorum.')}` 
-        : '#';
-    }
-
-    // SMS
-    if (this.btnSmsNobetci) {
-      this.btnSmsNobetci.href = phoneClean ? `sms:${phoneClean}` : '#';
+    if (els.whatsapp) {
+      // wa.me uluslararası biçim ister: 0535... → 90535...
+      const waNumber = phoneClean.replace(/^\+/, '').replace(/^0/, '90');
+      els.whatsapp.href = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}` : '#';
+      els.whatsapp.classList.toggle('opacity-60', !phoneClean);
+      els.whatsapp.classList.toggle('pointer-events-none', !phoneClean);
     }
   }
 
-  getTodayWeek() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    let week = this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
-    if (!week && this.weeks.length > 0) {
-      week = this.weeks.find(w => w.startDate >= todayStr) || this.weeks[0];
+  renderNobetciCard() {
+    const doc = this.activeNobetci;
+    if (this.nobetciNameEl) {
+      this.nobetciNameEl.textContent = doc ? doc.name : this.emptyLabel('Nöbetçi girilmemiş');
     }
-    return week;
+    if (this.nobetciRoleText) this.nobetciRoleText.textContent = "Nöbetçi Hekim";
+    if (this.nobetciPhoneDisplay) {
+      this.nobetciPhoneDisplay.textContent = !doc
+        ? (!this.hasLoaded ? '' : this.syncOk ? 'E-Tabloda bu gün için nöbetçi yok' : 'Google E-Tabloya ulaşılamadı')
+        : (doc.phone ? `Telefon: ${doc.phone}` : 'Telefon rehberden eklenebilir');
+    }
+
+    // Tablo kaynaklı nöbetçi tabloda değiştirilir; el ile seçim yalnızca kayıt yokken sunulur.
+    if (this.btnQuickSelectNobet) {
+      this.btnQuickSelectNobet.classList.toggle('hidden', !!(doc && doc.fromSheet));
+    }
+
+    this.setContactLinks(
+      { call: this.btnCallNobetci, whatsapp: this.btnWhatsappNobetci },
+      doc ? doc.phone : '',
+      'Hocam iyi nöbetler, servisten arıyorum.',
+      () => (doc && doc.fromSheet) ? this.switchTab('tab-search') : this.openNobetciModal()
+    );
+  }
+
+  // İcap haftası nöbet gününe göre bulunur; kayıt yoksa başka haftanın icapçısı gösterilmez.
+  getTodayWeek() {
+    const todayStr = this.dutyDateStr;
+    return this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
   }
 
   renderIcapciCard() {
     const week = this.getTodayWeek();
-    if (!week) return;
+    const liveDoc = week ? this.directory.getDoctor(week.activeCode) : null;
 
-    // Refresh live doctor data from directory
-    const liveDoc = this.directory.getDoctor(week.activeCode);
-
-    if (this.icapciNameEl) this.icapciNameEl.textContent = liveDoc.name;
-    if (this.icapRangeBadge) this.icapRangeBadge.textContent = week.rangeText;
-    if (this.icapWeekText) this.icapWeekText.textContent = `${week.rangeText} (Haftalık İcap)`;
+    if (this.icapciNameEl) {
+      this.icapciNameEl.textContent = liveDoc ? liveDoc.name : this.emptyLabel('İcapçı girilmemiş');
+    }
+    if (this.icapRangeBadge) this.icapRangeBadge.textContent = week ? week.rangeText : 'Haftalık';
+    if (this.icapWeekText) {
+      this.icapWeekText.textContent = week
+        ? `${week.rangeText} (Haftalık İcap)`
+        : (!this.hasLoaded ? 'Google Drive ile senkronize ediliyor...' : this.syncOk ? 'E-Tabloda bu hafta için icap kaydı yok' : 'Google E-Tabloya ulaşılamadı');
+    }
     if (this.icapciRoleText) this.icapciRoleText.textContent = "İcap Sorumlu Hekimi";
 
-    const phoneClean = this.cleanPhone(liveDoc.phone);
-
-    // Call Button
-    if (this.btnCallIcapci) {
-      if (phoneClean) {
-        this.btnCallIcapci.href = `tel:${phoneClean}`;
-        this.btnCallIcapci.classList.remove('opacity-60');
-      } else {
-        this.btnCallIcapci.href = "#";
-        this.btnCallIcapci.onclick = (e) => {
-          e.preventDefault();
-          this.switchTab('tab-search');
-        };
-      }
-    }
-
-    // WhatsApp
-    if (this.btnWhatsappIcapci) {
-      const waNumber = phoneClean.replace(/^\+/, '');
-      this.btnWhatsappIcapci.href = phoneClean 
-        ? `https://wa.me/${waNumber}?text=${encodeURIComponent('Hocam merhaba, icap göreviniz için klinikten arıyorum.')}` 
-        : '#';
-    }
-
-    // SMS
-    if (this.btnSmsIcapci) {
-      this.btnSmsIcapci.href = phoneClean ? `sms:${phoneClean}` : '#';
-    }
+    this.setContactLinks(
+      { call: this.btnCallIcapci, whatsapp: this.btnWhatsappIcapci },
+      liveDoc ? liveDoc.phone : '',
+      'Hocam merhaba, icap göreviniz için klinikten arıyorum.',
+      () => this.switchTab('tab-search')
+    );
   }
 
   renderUpcomingWeeks() {
     if (!this.upcomingList) return;
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const todayStr = getDutyDateStr();
 
     const upcoming = this.weeks.filter(w => w.endDate >= todayStr).slice(0, 6);
 
@@ -1132,12 +1107,12 @@ class VigilApp {
     if (!this.nobetModal) return;
     const docs = this.directory.getAll();
     this.selectNobetciDoc.innerHTML = docs.map(d => `
-      <option value="${d.code}" ${d.code === this.activeNobetci.code ? 'selected' : ''}>
+      <option value="${d.code}" ${this.activeNobetci && d.code === this.activeNobetci.code ? 'selected' : ''}>
         ${d.name}
       </option>
     `).join('');
 
-    this.inputNobetciCustomPhone.value = this.activeNobetci.phone || '';
+    this.inputNobetciCustomPhone.value = (this.activeNobetci && this.activeNobetci.phone) || '';
     this.nobetModal.classList.add('open');
     if (window.lucide) lucide.createIcons();
   }
