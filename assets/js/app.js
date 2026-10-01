@@ -722,7 +722,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.5').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.6').then(reg => {
         reg.update();
       }).catch(() => {});
     }
@@ -794,12 +794,24 @@ class VigilApp {
   }
 
   // Telefon yoksa ana düğme pasifleşir ve nedenini yazar; WhatsApp satırı gizlenir.
-  setContactLinks(els, phone, missingLabel, callLabel) {
+  // Büyük arama düğmesi etiketi: üstte işlem, adı varsa altında kendi satırında (bölünmez)
+  callBtnLabelHtml(main, sub) {
+    return sub
+      ? `<span class="call-btn-label"><span>${main}</span><span class="call-btn-sub">(${sub})</span></span>`
+      : main;
+  }
+
+  setContactLinks(els, phone, missingLabel, callLabel, callSub) {
     const phoneClean = this.cleanPhone(phone);
     if (els.call) {
       const label = els.call.querySelector('span');
       if (label && !els.call.dataset.label) els.call.dataset.label = label.textContent;
-      if (label) label.textContent = phoneClean ? (callLabel || els.call.dataset.label) : missingLabel;
+      if (label) {
+        label.innerHTML = this.callBtnLabelHtml(
+          phoneClean ? (callLabel || els.call.dataset.label) : missingLabel,
+          phoneClean ? callSub : ''
+        );
+      }
       els.call.href = phoneClean ? `tel:${phoneClean}` : '#';
       els.call.onclick = phoneClean ? null : (e) => e.preventDefault();
       els.call.classList.toggle('opacity-60', !phoneClean);
@@ -933,7 +945,8 @@ class VigilApp {
       { call: this.btnCallIcapci, whatsapp: this.btnWhatsappIcapci },
       uzman ? uzman.phone : '',
       uzman ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ',
-      split ? `SORUMLU UZMANI ARA (${uzman.shortName || uzman.name})` : null
+      split ? 'SORUMLU UZMANI ARA' : null,
+      split ? (uzman.shortName || uzman.name) : ''
     );
   }
 
@@ -1027,7 +1040,7 @@ class VigilApp {
             ${phoneClean ? `
               <a href="tel:${phoneClean}" class="call-btn-large call-btn-nobet py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold transition-all">
                 <i data-lucide="phone-call" class="w-4 h-4"></i>
-                <span>NÖBETÇİYİ ARA (${dailyDoc.shortName || dailyDoc.name})</span>
+                <span class="call-btn-label"><span>NÖBETÇİYİ ARA</span><span class="call-btn-sub">(${dailyDoc.shortName || dailyDoc.name})</span></span>
               </a>
             ` : `
               <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>
@@ -1055,7 +1068,7 @@ class VigilApp {
             ${uzmanTel ? `
               <a href="tel:${uzmanTel}" class="call-btn-large call-btn-icap py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-sky-500 hover:bg-sky-400 text-neutral-950 font-bold transition-all">
                 <i data-lucide="phone-call" class="w-4 h-4"></i>
-                <span>${hasSpecialist ? 'SORUMLU UZMANI ARA' : 'İCAPÇIYI ARA'} (${uzman.shortName || uzman.name})</span>
+                <span class="call-btn-label"><span>${hasSpecialist ? 'SORUMLU UZMANI ARA' : 'İCAPÇIYI ARA'}</span><span class="call-btn-sub">(${uzman.shortName || uzman.name})</span></span>
               </a>
             ` : `
               <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>

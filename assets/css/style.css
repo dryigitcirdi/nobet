@@ -200,6 +200,29 @@ body {
   transform: scale(0.97);
 }
 
+/* Büyük arama düğmesi etiketi: üstte işlem, altta (ad) kendi satırında ve bölünmeden */
+.call-btn-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Üst satır dar ekranda bölünmesin: yazı ekrana göre küçülür */
+.call-btn-label > span:first-child {
+  white-space: nowrap;
+  font-size: min(1.05rem, 4.3vw);
+}
+
+.call-btn-sub {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
 .call-btn-nobet {
   background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
   color: #070709;
