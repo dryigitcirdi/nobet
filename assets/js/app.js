@@ -21,11 +21,11 @@ const INITIAL_DOCTORS = {
   "HK": { code: "HK", name: "Dr. Hasan Kara", shortName: "Dr. Hasan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0544 532 35 55" },
   "ATB": { code: "ATB", name: "Dr. Alp Er Tunga Bölükbaşı", shortName: "Dr. Alp Er Tunga", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0530 496 80 77" },
   "SR": { code: "SR", name: "Dr. Servin Rafi", shortName: "Dr. Servin", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0538 274 41 11" },
-  "UA": { code: "UA", name: "Dr. Umut Akgün", shortName: "Dr. Umut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "KÖ": { code: "KÖ", name: "Dr. Korhan Özkan", shortName: "Dr. Korhan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "BA": { code: "BA", name: "Dr. Burak Akan", shortName: "Dr. Burak", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "KS": { code: "KS", name: "Dr. Kerim Sarıyılmaz", shortName: "Dr. Kerim", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" },
-  "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "" }
+  "UA": { code: "UA", name: "Dr. Umut Akgün", shortName: "Dr. Umut", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0532 794 22 88" },
+  "KÖ": { code: "KÖ", name: "Dr. Korhan Özkan", shortName: "Dr. Korhan", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0532 224 24 48" },
+  "BA": { code: "BA", name: "Dr. Burak Akan", shortName: "Dr. Burak", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0505 502 53 27" },
+  "KS": { code: "KS", name: "Dr. Kerim Sarıyılmaz", shortName: "Dr. Kerim", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0533 541 66 03" },
+  "SG": { code: "SG", name: "Dr. Safa Gürsoy", shortName: "Dr. Safa", role: "Ortopedi & Travmatoloji Uzmanı", phone: "0505 489 66 32" }
 };
 
 // E-Tablodaki icap kısaltması rehberdeki kodundan farklıysa burada eşlenir.
@@ -175,10 +175,8 @@ class WeeklyDriveService {
         const note = getCell(5);
         const extraChange = getCell(6);
 
-        // Determine who the active icap doctor is:
-        // Priority 1: Column E (changeCode) if not empty/non-doctor note
-        // Priority 2: Column G (extraChange) if not empty/non-doctor note
-        // Fallback: Column D (scheduledCode)
+        // E (değişim) "doğru kişi bu sütun" kuralıyla geçerlidir: doluysa hem icapçı hem aranacak kişi odur.
+        // E boşsa icapçı D'dir. KS gibi icapları paylaşılan haftalarda aranacak kişi G'deki sorumlu uzmandır.
         const isDoctorValue = (val) => {
           if (!val) return false;
           const clean = val.trim();
@@ -190,14 +188,10 @@ class WeeklyDriveService {
           return true;
         };
 
-        let activeCode = scheduledCode;
-        if (isDoctorValue(changeCode)) {
-          activeCode = changeCode;
-        } else if (isDoctorValue(extraChange)) {
-          activeCode = extraChange;
-        }
-
-        const activeDoc = this.directory.getDoctor(activeCode);
+        const activeCode = isDoctorValue(changeCode) ? changeCode : scheduledCode;
+        const calleeCode = isDoctorValue(changeCode)
+          ? changeCode
+          : (isDoctorValue(extraChange) ? extraChange : scheduledCode);
 
         roster.push({
           startDate: parsedStart.iso,
@@ -206,7 +200,7 @@ class WeeklyDriveService {
           endDateObj: parsedEnd.dateObj,
           rangeText: `${startStr} – ${endStr}`,
           activeCode,
-          activeDoctor: activeDoc,
+          calleeCode,
           notes: note || ''
         });
       });
@@ -541,6 +535,9 @@ class VigilApp {
     this.icapciRoleText = document.getElementById('today-icapci-role-text');
     this.icapRangeBadge = document.getElementById('icap-range-badge');
     this.icapWeekText = document.getElementById('icap-week-text');
+    this.icapCalleeNote = document.getElementById('icap-callee-note');
+    this.icapCalleeName = document.getElementById('icap-callee-name');
+    this.icapCalleeReason = document.getElementById('icap-callee-reason');
     this.btnCallIcapci = document.getElementById('btn-call-icapci');
     this.btnWhatsappIcapci = document.getElementById('btn-whatsapp-icapci');
 
@@ -695,8 +692,8 @@ class VigilApp {
 
     let icapHtml = '';
     if (week) {
-      const liveDoc = this.directory.getDoctor(week.activeCode);
-      const phoneClean = this.cleanPhone(liveDoc.phone);
+      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(week);
+      const phoneClean = this.cleanPhone(callee.phone);
       icapHtml = `
         <div class="flex items-center justify-between">
           <div>
@@ -706,9 +703,10 @@ class VigilApp {
             </div>
             <h4 class="text-base font-bold text-white">${liveDoc.name}</h4>
             <p class="text-[11px] text-white/50 font-mono mt-0.5">${week.rangeText}</p>
+            ${delegated ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Aranacak kişi: ${callee.name}</p>` : ''}
           </div>
           ${phoneClean ? `
-            <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${liveDoc.name} Ara">
+            <a href="tel:${phoneClean}" class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${callee.name} Ara">
               <i data-lucide="phone-call" class="w-5 h-5"></i>
             </a>
           ` : ''}
@@ -724,7 +722,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.3').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.4').then(reg => {
         reg.update();
       }).catch(() => {});
     }
@@ -796,12 +794,12 @@ class VigilApp {
   }
 
   // Telefon yoksa ana düğme pasifleşir ve nedenini yazar; WhatsApp satırı gizlenir.
-  setContactLinks(els, phone, waMessage, missingLabel) {
+  setContactLinks(els, phone, waMessage, missingLabel, callLabel) {
     const phoneClean = this.cleanPhone(phone);
     if (els.call) {
       const label = els.call.querySelector('span');
       if (label && !els.call.dataset.label) els.call.dataset.label = label.textContent;
-      if (label) label.textContent = phoneClean ? els.call.dataset.label : missingLabel;
+      if (label) label.textContent = phoneClean ? (callLabel || els.call.dataset.label) : missingLabel;
       els.call.href = phoneClean ? `tel:${phoneClean}` : '#';
       els.call.onclick = phoneClean ? null : (e) => e.preventDefault();
       els.call.classList.toggle('opacity-60', !phoneClean);
@@ -847,9 +845,18 @@ class VigilApp {
     return this.weeks.find(w => todayStr >= w.startDate && todayStr <= w.endDate);
   }
 
+  // İcapçı olarak adı geçen kişi ile aranacak kişi. KS gibi icapları paylaşılan haftalarda
+  // ikisi farklıdır: kartta KS yazar, aranacak kişi G sütunundaki sorumlu uzmandır.
+  getIcapPeople(week) {
+    const shown = this.directory.getDoctor(week.activeCode);
+    const callee = this.directory.getDoctor(week.calleeCode || week.activeCode);
+    return { shown, callee, delegated: callee.code !== shown.code };
+  }
+
   renderIcapciCard() {
     const week = this.getTodayWeek();
-    const liveDoc = week ? this.directory.getDoctor(week.activeCode) : null;
+    const people = week ? this.getIcapPeople(week) : null;
+    const liveDoc = people ? people.shown : null;
 
     if (this.icapciNameEl) {
       this.icapciNameEl.textContent = liveDoc ? liveDoc.name : this.emptyLabel('İcapçı girilmemiş');
@@ -862,11 +869,25 @@ class VigilApp {
     }
     if (this.icapciRoleText) this.icapciRoleText.textContent = "İcap Sorumlu Hekimi";
 
+    // İcap paylaşılan haftada kartın altına "Aranacak kişi" notu düşer
+    const delegated = !!(people && people.delegated);
+    if (this.icapCalleeNote) {
+      this.icapCalleeNote.style.display = delegated ? '' : 'none';
+      if (delegated) {
+        const callee = people.callee;
+        this.icapCalleeName.textContent = callee.name;
+        this.icapCalleeReason.textContent =
+          `${liveDoc.shortName || liveDoc.name} icabında sorumlu uzman` + (callee.phone ? ` · ${callee.phone}` : '');
+      }
+    }
+
+    const callee = people ? people.callee : null;
     this.setContactLinks(
       { call: this.btnCallIcapci, whatsapp: this.btnWhatsappIcapci },
-      liveDoc ? liveDoc.phone : '',
+      callee ? callee.phone : '',
       'Hocam merhaba, icap göreviniz için klinikten arıyorum.',
-      liveDoc ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ'
+      callee ? 'TELEFON YOK' : 'İCAPÇI BELİRSİZ',
+      delegated ? 'SORUMLU UZMANI ARA' : null
     );
   }
 
@@ -883,8 +904,8 @@ class VigilApp {
 
     this.upcomingList.innerHTML = upcoming.map((w, idx) => {
       const isCurrent = todayStr >= w.startDate && todayStr <= w.endDate;
-      const liveDoc = this.directory.getDoctor(w.activeCode);
-      const phoneClean = this.cleanPhone(liveDoc.phone);
+      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(w);
+      const phoneClean = this.cleanPhone(callee.phone);
 
       return `
         <div data-week-idx="${idx}" class="glass-panel p-3.5 hover:bg-white/[0.06] active:scale-[0.98] cursor-pointer transition-all">
@@ -903,10 +924,11 @@ class VigilApp {
                   ${isCurrent ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 font-mono font-bold">BU HAFTA</span>' : ''}
                 </div>
                 <p class="text-xs text-white/50 font-mono mt-0.5">${w.rangeText}</p>
+                ${delegated ? `<p class="text-[11px] text-sky-300/80 mt-0.5">Aranacak: ${callee.name}</p>` : ''}
               </div>
             </div>
             ${phoneClean ? `
-              <a href="tel:${phoneClean}" class="w-9 h-9 rounded-full bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${liveDoc.name} Ara">
+              <a href="tel:${phoneClean}" class="w-9 h-9 rounded-full bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center active:scale-90 transition-all shrink-0 ml-2" title="${callee.name} Ara">
                 <i data-lucide="phone" class="w-4 h-4"></i>
               </a>
             ` : `
@@ -978,8 +1000,8 @@ class VigilApp {
     }
 
     if (week) {
-      const liveDoc = this.directory.getDoctor(week.activeCode);
-      const phoneClean = this.cleanPhone(liveDoc.phone);
+      const { shown: liveDoc, callee, delegated } = this.getIcapPeople(week);
+      const phoneClean = this.cleanPhone(callee.phone);
       contentHtml += `
         <div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/25 space-y-3">
           <div class="flex items-center justify-between">
@@ -990,11 +1012,18 @@ class VigilApp {
             <h4 class="text-xl font-bold text-white">${liveDoc.name}</h4>
             <p class="text-xs text-sky-300/80">İcap Sorumlu Hekimi</p>
           </div>
+          ${delegated ? `
+            <div class="rounded-xl bg-white/[0.06] px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider font-mono text-sky-300/80">Aranacak kişi</p>
+              <p class="text-sm font-bold text-white">${callee.name}</p>
+              <p class="text-[11px] text-white/55">${liveDoc.shortName || liveDoc.name} icabında sorumlu uzman</p>
+            </div>
+          ` : ''}
           <div class="pt-2">
             ${phoneClean ? `
               <a href="tel:${phoneClean}" class="call-btn-large call-btn-icap py-3 flex items-center justify-center gap-2 w-full rounded-xl bg-sky-500 hover:bg-sky-400 text-neutral-950 font-bold transition-all">
                 <i data-lucide="phone-call" class="w-4 h-4"></i>
-                <span>İCAPÇIYI ARA (${liveDoc.shortName || liveDoc.name})</span>
+                <span>${delegated ? 'SORUMLU UZMANI ARA' : 'İCAPÇIYI ARA'} (${callee.shortName || callee.name})</span>
               </a>
             ` : `
               <div class="text-xs text-white/50 text-center py-2 font-mono">Telefon kayıtlı değil.</div>

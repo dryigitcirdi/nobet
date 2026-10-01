@@ -45,7 +45,7 @@
   <meta http-equiv="Expires" content="0">
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="assets/css/style.css?v=3.3">
+  <link rel="stylesheet" href="assets/css/style.css?v=3.4">
 </head>
 <body class="safe-top-padding safe-bottom-padding select-none">
 
@@ -181,6 +181,13 @@
             <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-white/40"></i>
             <span id="icap-week-text">Google Drive ile senkronize ediliyor...</span>
           </p>
+        </div>
+
+        <!-- Aranacak kişi notu: icap paylaşılan (KS gibi) haftalarda G sütunundaki sorumlu uzman -->
+        <div id="icap-callee-note" style="display:none" class="mb-4 rounded-2xl border border-sky-400/25 bg-sky-400/10 px-3.5 py-2.5">
+          <p class="text-[10px] uppercase tracking-wider font-mono text-sky-300/80">Aranacak kişi</p>
+          <p id="icap-callee-name" class="text-base font-bold text-white leading-snug"></p>
+          <p id="icap-callee-reason" class="text-[11px] text-white/55 font-mono"></p>
         </div>
 
         <!-- BÜYÜK DOĞRUDAN ARAMA BUTONU (İCAPÇI) -->
@@ -322,6 +329,6 @@
   </nav>
 
   <!-- Application Logic -->
-  <script src="assets/js/app.js?v=3.3"></script>
+  <script src="assets/js/app.js?v=3.4"></script>
 </body>
 </html>
