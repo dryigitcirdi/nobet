@@ -407,15 +407,17 @@ class CalendarView {
       const weekItem = this.getWeekForDate(dateStr);
 
       const liveDoc = weekItem ? this.directory.getDoctor(weekItem.activeCode) : null;
-      const shortDisplay = liveDoc ? (liveDoc.shortName || liveDoc.name.replace('Dr. ', '')) : '';
+      // Hücrede yalnızca tablodaki kısaltma (YC, UA…): "Dr. …" dar hücrede kesilip kimin olduğu anlaşılmıyordu
+      const rawCode = weekItem ? String(weekItem.activeCode).trim().toLocaleUpperCase('tr-TR') : '';
+      const codeDisplay = liveDoc ? (rawCode && rawCode.length <= 4 ? rawCode : liveDoc.code) : '';
 
       html += `
         <button data-date="${dateStr}" class="cal-day-cell relative aspect-square p-1 rounded-2xl flex flex-col items-center justify-between transition-all group ${
           isToday ? 'bg-amber-400/15 ring-1.5 ring-amber-400 text-amber-300 font-bold' : 'hover:bg-white/10 bg-white/[0.03] text-white/80'
         }">
           <span class="text-xs font-mono leading-none pt-0.5">${day}</span>
-          ${shortDisplay ? `
-            <span class="text-[8.5px] leading-tight font-medium px-1 py-0.5 rounded w-full text-center truncate text-white/75 bg-white/[0.04]" title="${liveDoc.name}">${shortDisplay}</span>
+          ${codeDisplay ? `
+            <span class="text-[8.5px] leading-tight font-medium px-1 py-0.5 rounded w-full text-center truncate text-white/75 bg-white/[0.04]" title="${liveDoc.name}">${codeDisplay}</span>
           ` : '<span class="h-2"></span>'}
         </button>
       `;
@@ -722,7 +724,7 @@ class VigilApp {
 
   initPwa() {
     if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.6').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=3.7').then(reg => {
         reg.update();
       }).catch(() => {});
     }
